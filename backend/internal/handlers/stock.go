@@ -15,6 +15,7 @@ type StockHandler struct {
 	quoteSvc     *services.StockQuoteService
 	ohlcvSvc     *services.OHLCVService
 	indicatorSvc *services.IndicatorService
+	metricsSvc   *services.MetricsService
 	db           *pgxpool.Pool
 }
 
@@ -24,6 +25,7 @@ func NewStockHandler(db *pgxpool.Pool) *StockHandler {
 		quoteSvc:     services.NewStockQuoteService(db),
 		ohlcvSvc:     services.NewOHLCVService(db),
 		indicatorSvc: services.NewIndicatorService(db),
+		metricsSvc:   services.NewMetricsService(db),
 		db:           db,
 	}
 }
@@ -119,8 +121,23 @@ func (h *StockHandler) GetIndicators(c *gin.Context) {
 }
 
 // GetMetrics handles GET /api/stocks/:ticker/metrics
+// AC: Returns ticker, fiscalPeriod, lastUpdated, and metrics object.
+// AC: Returns 404 for unknown tickers.
+// AC: Fiscal period and lastUpdated shown on every metric card.
 func (h *StockHandler) GetMetrics(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "not yet implemented"})
+	ticker := strings.ToUpper(c.Param("ticker"))
+
+	result, err := h.metricsSvc.GetMetrics(c.Request.Context(), ticker)
+	if err != nil {
+		if services.IsNotFound(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "ticker not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch metrics"})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // GetFinancials handles GET /api/stocks/:ticker/financials
