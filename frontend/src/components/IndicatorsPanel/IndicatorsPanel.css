@@ -1,0 +1,143 @@
+/* ── IndicatorsPanel ──────────────────────────────────────────────────────── */
+.indicators-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Toggle button */
+.indicators-panel__toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-text);
+  transition: background 0.1s ease;
+}
+
+.indicators-panel__toggle:hover,
+.indicators-panel__toggle--open {
+  background: var(--color-background);
+}
+
+.indicators-panel__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  background: var(--color-primary);
+  color: white;
+  border-radius: 50%;
+}
+
+/* Dropdown */
+.indicators-panel__dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: 8px;
+  z-index: 50;
+  min-width: 220px;
+}
+
+/* Individual indicator row */
+.indicators-panel__item {
+  padding: 2px 0;
+}
+
+.indicators-panel__indicator-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 0.875rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s ease;
+}
+
+.indicators-panel__indicator-btn:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+.indicators-panel__indicator-btn--active {
+  background: var(--color-background);
+  font-weight: 600;
+}
+
+.indicators-panel__indicator-btn--unavailable {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.indicators-panel__color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.indicators-panel__label {
+  flex: 1;
+}
+
+.indicators-panel__spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.indicators-panel__unavailable-badge {
+  font-size: 0.6875rem;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+/* Legend */
+.indicators-panel__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.indicators-panel__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.indicators-panel__legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
