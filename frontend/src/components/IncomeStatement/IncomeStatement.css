@@ -1,0 +1,143 @@
+/* ── IncomeStatement ──────────────────────────────────────────────────────── */
+.income-stmt {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Toolbar */
+.income-stmt__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.income-stmt__toolbar h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  flex: 1;
+}
+
+.income-stmt__period-toggle,
+.income-stmt__view-toggle {
+  display: flex;
+  gap: 2px;
+}
+
+.income-stmt__toggle-btn {
+  padding: 5px 12px;
+  font-size: 0.8125rem;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-text-secondary);
+}
+
+.income-stmt__toggle-btn--active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+  font-weight: 600;
+}
+
+/* Table */
+.income-stmt__table-wrapper {
+  overflow-x: auto;
+}
+
+.income-stmt__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.income-stmt__table th,
+.income-stmt__table td {
+  padding: 10px 12px;
+  text-align: right;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.income-stmt__table th:first-child,
+.income-stmt__table td:first-child {
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.income-stmt__table thead th {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  letter-spacing: 0.04em;
+  background: var(--color-background);
+}
+
+.income-stmt__table tbody tr:hover {
+  background: var(--color-surface-hover);
+}
+
+.income-stmt__gap {
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+/* Chart */
+.income-stmt__chart {
+  width: 100%;
+  height: 300px;
+}
+
+/* Show more */
+.income-stmt__show-more {
+  display: block;
+  margin: 16px auto 0;
+  padding: 8px 20px;
+  font-size: 0.875rem;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-text-secondary);
+}
+
+.income-stmt__show-more:hover {
+  background: var(--color-surface-hover);
+}
+
+/* Loading */
+.income-stmt__loading {
+  height: 200px;
+}
+
+.income-stmt__skeleton {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  border-radius: var(--radius-md);
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Error / empty */
+.income-stmt__error,
+.income-stmt__empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--color-muted);
+}
+
+.income-stmt__error {
+  color: var(--color-danger);
+}
