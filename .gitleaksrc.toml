@@ -1,0 +1,39 @@
+# ── Gitleaks configuration ────────────────────────────────────────────────────
+# Detects API keys, high-entropy strings, and known provider key patterns.
+# Run: gitleaks detect --source . --no-git --config .gitleaksrc.toml
+# See: https://github.com/gitleaks/gitleaks
+
+title = "cent-cent-go secret scanning"
+
+[[rules]]
+description = "Polygon.io API Key"
+id = "polygon-api-key"
+regex = '''(?i)(polygon[_-]?api[_-]?key|POLYGON_API_KEY)\s*[:=]\s*["']?([A-Za-z0-9_\-]{20,})["']?'''
+tags = ["key", "polygon", "finance"]
+
+[[rules]]
+description = "FRED API Key"
+id = "fred-api-key"
+regex = '''(?i)(fred[_-]?api[_-]?key|FRED_API_KEY)\s*[:=]\s*["']?([A-Za-z0-9]{32})["']?'''
+tags = ["key", "fred", "economics"]
+
+[[rules]]
+description = "Generic high-entropy API key assignment"
+id = "generic-api-key"
+regex = '''(?i)(api[_-]?key|apikey|secret[_-]?key)\s*[:=]\s*["']?([A-Za-z0-9+/]{32,64})["']?'''
+tags = ["key", "generic"]
+[rules.allowlist]
+regexes = ["your_.*_here", "example", "placeholder", "test", "dummy"]
+
+[[rules]]
+description = "Database connection string with credentials"
+id = "db-connection-string"
+regex = '''postgres://[^:]+:[^@]+@[^/]+/'''
+tags = ["database", "credentials"]
+[rules.allowlist]
+regexes = ["localhost", "127.0.0.1", "stockapp:stockapp"]
+
+[allowlist]
+description = "Allow example / placeholder values"
+files = ["\\.env\\.example$", "\\.gitleaksignore$"]
+paths = ["\\.env\\.example"]
