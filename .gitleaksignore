@@ -1,0 +1,6 @@
+# ── Gitleaks ignore file ──────────────────────────────────────────────────────
+# List fingerprints of known false positives here.
+# Format: <fingerprint>  # reason
+#
+# Example (add real fingerprints after first gitleaks run finds false positives):
+# 3e23b4d4a2e0f1c5f9a0b3c6e8d1f2a4b5c6d7e8f9a0b1c2  # test fixture API key in backend/internal/services/search_test.go
