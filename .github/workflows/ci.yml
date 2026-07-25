@@ -40,9 +40,11 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-          cache-dependency-path: backend/go.sum
+          # Use go.mod as the cache key. go.sum may not yet be committed on a
+          # fresh scaffold — `go mod download` below generates it automatically.
+          cache-dependency-path: backend/go.mod
 
-      - name: Download dependencies
+      - name: Download dependencies (generates go.sum if absent)
         run: go mod download
 
       - name: Vet
@@ -51,7 +53,7 @@ jobs:
       - name: Run tests
         run: go test ./... -v -race -count=1
         env:
-          # Use safe dummy values for unit tests — no real API calls
+          # Safe dummy values for unit tests — no real API calls are made
           POLYGON_API_KEY: test_key_polygon
           FRED_API_KEY: test_key_fred
           DATABASE_URL: postgres://stockapp:stockapp@localhost:5432/stockapp?sslmode=disable
@@ -73,10 +75,14 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          # Use package.json as fallback cache key when package-lock.json is absent
+          cache-dependency-path: |
+            frontend/package-lock.json
+            frontend/package.json
 
       - name: Install dependencies
-        run: npm ci
+        # Use `npm install` (not `npm ci`) so the lockfile is created if missing
+        run: npm install
 
       - name: Type check
         run: npm run typecheck
