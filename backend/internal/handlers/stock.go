@@ -12,21 +12,23 @@ import (
 
 // StockHandler handles /api/stocks/* endpoints
 type StockHandler struct {
-	quoteSvc     *services.StockQuoteService
-	ohlcvSvc     *services.OHLCVService
-	indicatorSvc *services.IndicatorService
-	metricsSvc   *services.MetricsService
-	db           *pgxpool.Pool
+	quoteSvc      *services.StockQuoteService
+	ohlcvSvc      *services.OHLCVService
+	indicatorSvc  *services.IndicatorService
+	metricsSvc    *services.MetricsService
+	financialsSvc *services.FinancialsService
+	db            *pgxpool.Pool
 }
 
 // NewStockHandler creates a new StockHandler.
 func NewStockHandler(db *pgxpool.Pool) *StockHandler {
 	return &StockHandler{
-		quoteSvc:     services.NewStockQuoteService(db),
-		ohlcvSvc:     services.NewOHLCVService(db),
-		indicatorSvc: services.NewIndicatorService(db),
-		metricsSvc:   services.NewMetricsService(db),
-		db:           db,
+		quoteSvc:      services.NewStockQuoteService(db),
+		ohlcvSvc:      services.NewOHLCVService(db),
+		indicatorSvc:  services.NewIndicatorService(db),
+		metricsSvc:    services.NewMetricsService(db),
+		financialsSvc: services.NewFinancialsService(db),
+		db:            db,
 	}
 }
 
@@ -140,9 +142,46 @@ func (h *StockHandler) GetMetrics(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-// GetFinancials handles GET /api/stocks/:ticker/financials
+// GetFinancials handles GET /api/stocks/:ticker/financials?statement=&period=&limit=
+// AC: Returns 400 for invalid statement type.
+// AC: Gaps in data (new public company mid-year) shown as missing entries (nil), not zeros.
 func (h *StockHandler) GetFinancials(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "not yet implemented"})
+	ticker := strings.ToUpper(c.Param("ticker"))
+	statement := c.DefaultQuery("statement", "income")
+	period := c.DefaultQuery("period", "annual")
+
+	if !services.IsValidStatement(statement) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid statement type — valid values: income, balance, cashflow",
+		})
+		return
+	}
+
+	if period != "annual" && period != "quarterly" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid period — valid values: annual, quarterly",
+		})
+		return
+	}
+
+	limit := 4
+	if l := c.Query("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 && n <= 20 {
+			limit = n
+		}
+	}
+
+	result, err := h.financialsSvc.GetFinancials(c.Request.Context(), ticker, statement, period, limit)
+	if err != nil {
+		if services.IsNotFound(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "ticker not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch financial statements"})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // GetELI5 handles GET /api/stocks/:ticker/eli5
