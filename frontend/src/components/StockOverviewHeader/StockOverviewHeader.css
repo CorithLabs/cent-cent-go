@@ -1,0 +1,149 @@
+/* ── StockOverviewHeader ──────────────────────────────────────────────────── */
+.stock-header {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Disclaimer */
+.stock-header__disclaimer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+
+/* Stale warning */
+.stock-header__stale-warning {
+  font-size: 0.8125rem;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+
+/* Identity */
+.stock-header__identity {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.stock-header__ticker {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--color-text);
+}
+
+.stock-header__name {
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+}
+
+.stock-header__exchange {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  background: var(--color-background);
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--color-border);
+}
+
+/* Status badges */
+.stock-header__badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 99px;
+}
+
+.stock-header__badge--closed {
+  background: #fef9c3;
+  color: #713f12;
+  border: 1px solid #fde047;
+}
+
+.stock-header__badge--delisted {
+  background: #fee2e2;
+  color: #7f1d1d;
+  border: 1px solid #fca5a5;
+}
+
+/* Price block */
+.stock-header__price-block {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.stock-header__price {
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.stock-header__change {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.stock-header__change--positive {
+  color: var(--color-success);
+}
+
+.stock-header__change--negative {
+  color: var(--color-danger);
+}
+
+/* Stats grid */
+.stock-header__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.stock-header__stat {
+  background: var(--color-background);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+
+.stock-header__stat dt {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.stock-header__stat dd {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* Freshness */
+.stock-header__freshness {
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+}
+
+.stock-header__source {
+  color: var(--color-muted);
+}
