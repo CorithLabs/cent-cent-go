@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'flow/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Secret scanning ─────────────────────────────────────────────────────────
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          config-path: .gitleaksrc.toml
+
+  # ── Backend (Go) ────────────────────────────────────────────────────────────
+  backend:
+    name: Backend tests (Go)
+    runs-on: ubuntu-latest
+    needs: [secret-scan]
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go 1.22
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: backend/go.sum
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Run tests
+        run: go test ./... -v -race -count=1
+        env:
+          # Use safe dummy values for unit tests — no real API calls
+          POLYGON_API_KEY: test_key_polygon
+          FRED_API_KEY: test_key_fred
+          DATABASE_URL: postgres://stockapp:stockapp@localhost:5432/stockapp?sslmode=disable
+
+  # ── Frontend (Node) ─────────────────────────────────────────────────────────
+  frontend:
+    name: Frontend tests (Vitest)
+    runs-on: ubuntu-latest
+    needs: [secret-scan]
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm run test
+
+      - name: Build (verify no build errors)
+        run: npm run build
