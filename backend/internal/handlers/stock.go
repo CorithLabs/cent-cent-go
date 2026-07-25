@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/CorithLabs/cent-cent-go/internal/services"
@@ -11,17 +12,19 @@ import (
 
 // StockHandler handles /api/stocks/* endpoints
 type StockHandler struct {
-	quoteSvc *services.StockQuoteService
-	ohlcvSvc *services.OHLCVService
-	db       *pgxpool.Pool
+	quoteSvc     *services.StockQuoteService
+	ohlcvSvc     *services.OHLCVService
+	indicatorSvc *services.IndicatorService
+	db           *pgxpool.Pool
 }
 
 // NewStockHandler creates a new StockHandler.
 func NewStockHandler(db *pgxpool.Pool) *StockHandler {
 	return &StockHandler{
-		quoteSvc: services.NewStockQuoteService(db),
-		ohlcvSvc: services.NewOHLCVService(db),
-		db:       db,
+		quoteSvc:     services.NewStockQuoteService(db),
+		ohlcvSvc:     services.NewOHLCVService(db),
+		indicatorSvc: services.NewIndicatorService(db),
+		db:           db,
 	}
 }
 
@@ -83,9 +86,36 @@ func (h *StockHandler) GetHistory(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-// GetIndicators handles GET /api/stocks/:ticker/indicators
+// GetIndicators handles GET /api/stocks/:ticker/indicators?indicator=&period=&range=
+// AC: Computes SMA, EMA, Bollinger, RSI, MACD server-side from stored OHLCV data.
+// AC: Returns 400 for unsupported indicator names.
+// AC: Insufficient data returns partial results with a warning field.
 func (h *StockHandler) GetIndicators(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "not yet implemented"})
+	ticker := strings.ToUpper(c.Param("ticker"))
+	indicator := strings.ToLower(c.Query("indicator"))
+	rangeStr := c.DefaultQuery("range", "1y")
+
+	if !services.IsValidIndicator(indicator) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "unsupported indicator — valid values: sma, ema, bollinger, rsi, macd",
+		})
+		return
+	}
+
+	period := 20 // sensible default
+	if p := c.Query("period"); p != "" {
+		if n, err := strconv.Atoi(p); err == nil && n > 0 && n <= 500 {
+			period = n
+		}
+	}
+
+	result, err := h.indicatorSvc.Compute(c.Request.Context(), ticker, indicator, rangeStr, period)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // GetMetrics handles GET /api/stocks/:ticker/metrics
