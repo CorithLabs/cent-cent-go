@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# ── Pre-commit hook: Secret scanning with gitleaks ───────────────────────────
+# Blocks commits if any secrets are detected.
+# Install: git config core.hooksPath .git-hooks
+#
+# Requires gitleaks: https://github.com/gitleaks/gitleaks#installing
+
+set -euo pipefail
+
+echo "🔍 Running gitleaks secret scan..."
+
+if ! command -v gitleaks &>/dev/null; then
+  echo "⚠️  gitleaks not found. Install it:"
+  echo "    brew install gitleaks   # macOS"
+  echo "    go install github.com/gitleaks/gitleaks/v8@latest   # Go"
+  echo ""
+  echo "Skipping secret scan (WARNING: secrets may be committed)."
+  exit 0
+fi
+
+if gitleaks detect \
+  --source . \
+  --no-git \
+  --config .gitleaksrc.toml \
+  --redact \
+  --quiet; then
+  echo "✅ No secrets detected."
+else
+  echo ""
+  echo "❌ Gitleaks detected potential secrets in the codebase."
+  echo "   Fix the issues above before committing."
+  echo "   If this is a false positive, add the fingerprint to .gitleaksignore."
+  exit 1
+fi

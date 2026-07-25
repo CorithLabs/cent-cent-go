@@ -1,0 +1,30 @@
+# ── Secrets (NEVER commit these) ──────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Go ────────────────────────────────────────────────────────────────────────
+backend/bin/
+backend/*.exe
+backend/vendor/
+
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ── Editor ────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# ── Test output ───────────────────────────────────────────────────────────────
+coverage/
+frontend/coverage/
+backend/coverage.out
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+# Keep docker-compose.yml but ignore any local override
+docker-compose.override.yml
