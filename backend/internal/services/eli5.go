@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -13,32 +12,36 @@ import (
 // ── Response types ────────────────────────────────────────────────────────────
 
 // ELI5Section represents a single analysed topic in the ELI5 report.
+// The frontend uses the Label field to prompt window.ai for a plain-English
+// narrative — no prose is generated server-side.
 type ELI5Section struct {
-	Topic                    string  `json:"topic"`
-	Emoji                    string  `json:"emoji"`
-	Label                    string  `json:"label"`
-	RawValue                 string  `json:"rawValue"`
-	SectorBenchmark          string  `json:"sectorBenchmark,omitempty"`
-	SectorBenchmarkUnavailable bool   `json:"sectorBenchmarkUnavailable,omitempty"`
+	Topic                      string  `json:"topic"`
+	Emoji                      string  `json:"emoji"`
+	Label                      string  `json:"label"`           // e.g. "pricey", "growing_fast"
+	RawValue                   string  `json:"rawValue"`        // human-readable raw metric
+	SectorBenchmark            string  `json:"sectorBenchmark,omitempty"`
+	SectorBenchmarkUnavailable bool    `json:"sectorBenchmarkUnavailable,omitempty"`
 }
 
 // ELI5Response is the full response for GET /api/stocks/:ticker/eli5.
 // AC: No LLM call is made server-side — frontend uses structured labels to prompt window.ai.
+// AC: Cached per ticker for 1 hour.
 type ELI5Response struct {
-	Ticker          string        `json:"ticker"`
-	GeneratedAt     string        `json:"generatedAt"`
-	OverallSentiment string       `json:"overallSentiment"` // "positive" | "neutral" | "caution" | "negative"
-	Headline        string        `json:"headline"`
-	Sections        []ELI5Section `json:"sections"`
-	DataAsOf        string        `json:"dataAsOf"`
+	Ticker           string        `json:"ticker"`
+	GeneratedAt      string        `json:"generatedAt"`
+	OverallSentiment string        `json:"overallSentiment"` // "positive"|"neutral"|"caution"|"negative"
+	Headline         string        `json:"headline"`
+	Sections         []ELI5Section `json:"sections"`
+	DataAsOf         string        `json:"dataAsOf"`
 }
 
 // ── Service ───────────────────────────────────────────────────────────────────
 
-// ELI5Service interprets fundamental metrics into a structured analysis.
+// ELI5Service interprets fundamental metrics into a structured rules-based analysis.
+// It fetches metrics via MetricsService and caches results in PostgreSQL for 1 hour.
 type ELI5Service struct {
-	db          *pgxpool.Pool
-	metricsSvc  *MetricsService
+	db         *pgxpool.Pool
+	metricsSvc *MetricsService
 }
 
 // NewELI5Service creates a new ELI5Service.
@@ -50,32 +53,34 @@ func NewELI5Service(db *pgxpool.Pool) *ELI5Service {
 }
 
 // GetELI5 returns the structured analysis for a ticker.
-// Checks a 1-hour cache before computing.
-// AC: No LLM is called. Computation is deterministic and rules-based.
+// AC: Checks a 1-hour cache before computing.
+// AC: Returns ErrNotFound for unknown tickers.
+// AC: No LLM is called — computation is deterministic and rules-based.
 func (s *ELI5Service) GetELI5(ctx context.Context, ticker string) (*ELI5Response, error) {
 	// Check cache (1 hour TTL)
-	cached, err := s.getCached(ctx, ticker)
-	if err == nil && cached != nil {
-		generated, _ := time.Parse(time.RFC3339, cached.GeneratedAt)
-		if time.Since(generated) < time.Hour {
-			return cached, nil
+	if s.db != nil {
+		cached, err := s.getCached(ctx, ticker)
+		if err == nil && cached != nil {
+			generated, parseErr := time.Parse(time.RFC3339, cached.GeneratedAt)
+			if parseErr == nil && time.Since(generated) < time.Hour {
+				return cached, nil
+			}
 		}
 	}
 
-	// Fetch fundamentals
+	// Fetch fundamentals via MetricsService
 	metrics, err := s.metricsSvc.GetMetrics(ctx, ticker)
 	if err != nil {
-		return nil, err
+		return nil, err // propagates ErrNotFound → handler returns 404
 	}
-
 	if metrics == nil {
-		return nil, fmt.Errorf("ticker %s not found", ticker)
+		return nil, ErrNotFound
 	}
 
 	// Build sections using rules-based interpretation
 	sections, sentimentScore := s.buildSections(metrics)
 
-	// Overall sentiment from weighted score
+	// Compute overall sentiment from weighted section scores
 	overallSentiment := scoreToSentiment(sentimentScore, len(sections))
 	headline := buildHeadline(ticker, overallSentiment)
 
@@ -88,7 +93,11 @@ func (s *ELI5Service) GetELI5(ctx context.Context, ticker string) (*ELI5Response
 		DataAsOf:         metrics.LastUpdated,
 	}
 
-	_ = s.upsertCache(ctx, ticker, response)
+	// Persist to cache (best-effort — failure is non-fatal)
+	if s.db != nil {
+		_ = s.upsertCache(ctx, ticker, response)
+	}
+
 	return response, nil
 }
 
@@ -96,11 +105,13 @@ func (s *ELI5Service) GetELI5(ctx context.Context, ticker string) (*ELI5Response
 
 // buildSections constructs ELI5 sections from fundamental metrics using rules.
 // Returns sections and a total sentiment score (higher = more positive).
+// AC: Missing metric from Polygon.io → skip that section rather than crashing.
 func (s *ELI5Service) buildSections(metrics *MetricsResponse) ([]ELI5Section, int) {
 	var sections []ELI5Section
 	totalScore := 0
 
-	// ── Valuation (P/E) ───────────────────────────────────────────────────
+	// ── Valuation (P/E) ──────────────────────────────────────────────────────
+	// AC: Negative P/E → override to 'not_yet_profitable'.
 	if metrics.Metrics.PE != nil {
 		pe := *metrics.Metrics.PE
 		label, score := interpretValuation(pe)
@@ -114,11 +125,10 @@ func (s *ELI5Service) buildSections(metrics *MetricsResponse) ([]ELI5Section, in
 		totalScore += score
 	}
 
-	// ── Growth (use revenue growth if available, else skip) ───────────────
-	// Note: YoY revenue growth would need 2 periods; for MVP we derive from EPS
+	// ── Profitability (EPS as proxy) ──────────────────────────────────────────
 	if metrics.Metrics.EPS != nil {
 		eps := *metrics.Metrics.EPS
-		label, score := interpretGrowth(eps)
+		label, score := interpretProfitability(eps)
 		sections = append(sections, ELI5Section{
 			Topic:    "Profitability",
 			Emoji:    "📈",
@@ -128,7 +138,7 @@ func (s *ELI5Service) buildSections(metrics *MetricsResponse) ([]ELI5Section, in
 		totalScore += score
 	}
 
-	// ── Debt ─────────────────────────────────────────────────────────────
+	// ── Debt (D/E ratio) ──────────────────────────────────────────────────────
 	if metrics.Metrics.DebtToEquity != nil {
 		de := *metrics.Metrics.DebtToEquity
 		label, score := interpretDebt(de)
@@ -142,19 +152,19 @@ func (s *ELI5Service) buildSections(metrics *MetricsResponse) ([]ELI5Section, in
 		totalScore += score
 	}
 
-	// ── Dividends (only include if yield > 0) ─────────────────────────────
+	// ── Dividends (only include section if yield > 0) ─────────────────────────
 	if metrics.Metrics.DividendYield != nil && *metrics.Metrics.DividendYield > 0 {
-		yield := *metrics.Metrics.DividendYield
+		yieldPct := *metrics.Metrics.DividendYield * 100
 		sections = append(sections, ELI5Section{
 			Topic:    "Dividends",
 			Emoji:    "💵",
 			Label:    "pays_dividend",
-			RawValue: fmt.Sprintf("Yield: %.2f%%", yield*100),
+			RawValue: fmt.Sprintf("Yield: %.2f%%", yieldPct),
 		})
-		totalScore += 1 // slightly positive signal
+		totalScore += 1 // pays dividend is a modestly positive signal
 	}
 
-	// ── ROE ───────────────────────────────────────────────────────────────
+	// ── Efficiency (ROE) ──────────────────────────────────────────────────────
 	if metrics.Metrics.ROE != nil {
 		roe := *metrics.Metrics.ROE
 		label, score := interpretROE(roe)
@@ -174,7 +184,7 @@ func (s *ELI5Service) buildSections(metrics *MetricsResponse) ([]ELI5Section, in
 // ── Interpretation rules ──────────────────────────────────────────────────────
 
 // interpretValuation returns label and score for P/E ratio.
-// AC: Negative P/E → 'not_yet_profitable' (override).
+// AC: Negative P/E → 'not_yet_profitable' override.
 func interpretValuation(pe float64) (string, int) {
 	if pe < 0 {
 		return "not_yet_profitable", -1
@@ -191,8 +201,9 @@ func interpretValuation(pe float64) (string, int) {
 	}
 }
 
-// interpretGrowth returns label and score based on EPS value as a profitability proxy.
-func interpretGrowth(eps float64) (string, int) {
+// interpretProfitability returns label and score based on EPS value.
+// Negative EPS = losing money; high EPS = highly profitable.
+func interpretProfitability(eps float64) (string, int) {
 	switch {
 	case eps < 0:
 		return "losing_money", -2
@@ -253,7 +264,7 @@ func scoreToSentiment(totalScore, numSections int) string {
 	}
 }
 
-// buildHeadline generates a short summary headline.
+// buildHeadline generates a short sentiment summary headline.
 func buildHeadline(ticker, sentiment string) string {
 	switch sentiment {
 	case "positive":
@@ -298,16 +309,4 @@ func (s *ELI5Service) upsertCache(ctx context.Context, ticker string, response *
 		ON CONFLICT (ticker) DO UPDATE SET payload = $2, generated_at = NOW()`,
 		ticker, payload)
 	return err
-}
-
-// ── Utility ───────────────────────────────────────────────────────────────────
-
-// float64Ptr is a helper for pointer-to-float64.
-func float64Ptr(f float64) *float64 {
-	return &f
-}
-
-// abs returns the absolute value of a float64.
-func absFloat(f float64) float64 {
-	return math.Abs(f)
 }
