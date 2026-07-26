@@ -10,9 +10,8 @@ import (
 	"sync"
 
 	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark-meta"
+	meta "github.com/yuin/goldmark-meta"
 	"github.com/yuin/goldmark/parser"
-	"github.com/yuin/goldmark/text"
 )
 
 // ── Article types ──────────────────────────────────────────────────────────────
@@ -26,13 +25,13 @@ type LearnSection struct {
 
 // LearnArticle is the full article returned by GET /api/learn/:slug.
 type LearnArticle struct {
-	Slug            string         `json:"slug"`
-	Title           string         `json:"title"`
-	Summary         string         `json:"summary"`
-	Sections        []LearnSection `json:"sections"`
-	RelatedSlugs    []string       `json:"relatedSlugs"`
-	Tags            []string       `json:"tags"`
-	ReadTime        string         `json:"readTime"`
+	Slug         string         `json:"slug"`
+	Title        string         `json:"title"`
+	Summary      string         `json:"summary"`
+	Sections     []LearnSection `json:"sections"`
+	RelatedSlugs []string       `json:"relatedSlugs"`
+	Tags         []string       `json:"tags"`
+	ReadTime     string         `json:"readTime"`
 }
 
 // LearnArticleCard is the list item returned by GET /api/learn.
@@ -65,7 +64,6 @@ type LearnService struct {
 
 // NewLearnService creates and loads a LearnService from the given content directory.
 // articlesDir should be the path to /content/learn relative to the working directory.
-// AC: Called at server startup with the articles directory path.
 func NewLearnService(articlesDir string) *LearnService {
 	svc := &LearnService{
 		articles: make(map[string]*LearnArticle),
@@ -100,8 +98,7 @@ func (s *LearnService) GetArticle(slug string) (*LearnArticle, error) {
 func (s *LearnService) loadAll(dir string) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		// Content directory may not exist during tests or early dev — log and continue.
-		log.Printf("[learn] content directory %q not found: %v", dir, err)
+		log.Printf("[learn] content directory %q not found or unreadable: %v", dir, err)
 		return
 	}
 
@@ -136,7 +133,7 @@ func (s *LearnService) loadAll(dir string) {
 }
 
 // parseMarkdownFile reads and parses a single .md file using goldmark + goldmark-meta.
-// AC: Uses goldmark library for markdown body and goldmark-meta for YAML frontmatter.
+// AC: Uses goldmark for markdown body and goldmark-meta for YAML frontmatter.
 func parseMarkdownFile(filePath, slug string) (*LearnArticle, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
@@ -152,11 +149,6 @@ func parseMarkdownFile(filePath, slug string) (*LearnArticle, error) {
 
 	var buf bytes.Buffer
 	ctx := parser.NewContext()
-	src := text.NewReader(data)
-
-	// Parse using goldmark with context (for meta extraction)
-	reader := text.NewReader(data)
-	_ = reader
 
 	if err := md.Convert(data, &buf, parser.WithContext(ctx)); err != nil {
 		return nil, fmt.Errorf("parse markdown: %w", err)
@@ -193,20 +185,16 @@ func parseMarkdownFile(filePath, slug string) (*LearnArticle, error) {
 	}, nil
 }
 
-// parseSectionsFromHTML splits the rendered HTML into progressive depth sections
-// by splitting on <h2> tags.
+// parseSectionsFromHTML splits rendered HTML into progressive depth sections by <h2> tags.
 func parseSectionsFromHTML(html string) []LearnSection {
 	var sections []LearnSection
 
-	// Split HTML by <h2> tags to get sections
 	parts := strings.Split(html, "<h2>")
 	for i, part := range parts {
 		if i == 0 {
-			// Content before the first h2 — skip (usually frontmatter remnants)
-			continue
+			continue // skip content before first h2
 		}
 
-		// Extract h2 heading
 		closingIdx := strings.Index(part, "</h2>")
 		if closingIdx < 0 {
 			continue
@@ -214,7 +202,6 @@ func parseSectionsFromHTML(html string) []LearnSection {
 		heading := strings.TrimSpace(part[:closingIdx])
 		body := strings.TrimSpace(part[closingIdx+5:])
 
-		// Clean heading of any HTML tags
 		heading = stripHTMLTags(heading)
 
 		sections = append(sections, LearnSection{
@@ -228,8 +215,8 @@ func parseSectionsFromHTML(html string) []LearnSection {
 
 // ── Frontmatter helpers ────────────────────────────────────────────────────────
 
-func extractString(meta map[string]interface{}, key string) (string, error) {
-	v, ok := meta[key]
+func extractString(metaMap map[string]interface{}, key string) (string, error) {
+	v, ok := metaMap[key]
 	if !ok {
 		return "", fmt.Errorf("missing key %q", key)
 	}
@@ -261,25 +248,19 @@ func extractStringSlice(metaData map[string]interface{}, key string) []string {
 	}
 }
 
-// stripHTMLTags removes HTML tags from a string (simple regex-free implementation).
+// stripHTMLTags removes HTML tags from a string.
 func stripHTMLTags(s string) string {
 	var result strings.Builder
 	inTag := false
 	for _, r := range s {
-		if r == '<' {
+		switch {
+		case r == '<':
 			inTag = true
-			continue
-		}
-		if r == '>' {
+		case r == '>':
 			inTag = false
-			continue
-		}
-		if !inTag {
+		case !inTag:
 			result.WriteRune(r)
 		}
 	}
 	return result.String()
 }
-
-// src is used to satisfy the goldmark text.NewReader call
-var _ = text.NewReader
