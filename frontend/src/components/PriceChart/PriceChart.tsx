@@ -9,9 +9,6 @@ import {
   ResponsiveContainer,
   CartesianGrid,
   ReferenceLine,
-  defs,
-  LinearGradient,
-  Stop,
 } from 'recharts';
 import { useOHLCV, ChartRange, OHLCVBar } from '../../hooks/useOHLCV';
 import { downloadOHLCVAsCSV } from '../../utils/csvExport';
@@ -178,7 +175,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({ ticker }) => {
               data={chartData}
               margin={{ top: 8, right: 8, left: 0, bottom: 8 }}
             >
-              {/* Gradient fill for area under price line */}
+              {/* Gradient fill for area under price line — uses native SVG, no Recharts import needed */}
               <defs>
                 <linearGradient id={`accentGrad-${ticker}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={THEME.accentColor} stopOpacity={0.18} />
