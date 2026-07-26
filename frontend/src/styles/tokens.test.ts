@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Unit test for src/styles/tokens.css
  *
