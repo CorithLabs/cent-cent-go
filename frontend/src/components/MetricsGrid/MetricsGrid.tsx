@@ -3,7 +3,8 @@ import { MetricsResponse } from '../../hooks/useMetrics';
 import './MetricsGrid.css';
 
 interface MetricsGridProps {
-  data: MetricsResponse;
+  data: MetricsResponse | null;
+  isLoading?: boolean;
 }
 
 interface MetricDef {
@@ -11,7 +12,9 @@ interface MetricDef {
   label: string;
   learnSlug: string;
   format: (v: number) => string;
-  naReason: string; // shown in tooltip when value is null
+  naReason: string;
+  /** True if this field represents a gain/loss — coloured positive/negative */
+  isChangePct?: boolean;
 }
 
 const METRIC_DEFS: MetricDef[] = [
@@ -66,15 +69,34 @@ const METRIC_DEFS: MetricDef[] = [
   },
 ];
 
+const SKELETON_COUNT = METRIC_DEFS.length;
+
 /**
  * MetricsGrid — displays fundamental metric cards for the Financials tab.
- * AC: Shows P/E, P/B, EPS, dividend yield, beta, ROE, debt-to-equity.
- * AC: Each card shows fiscal period and "What is this?" link.
- * AC: Null values show "N/A" with tooltip explaining why.
- * AC: Negative P/E renders correctly.
- * AC: Zero dividend shows "—" not "0%".
+ *
+ * AC: 2-column mobile, 4-column desktop grid.
+ * AC: Each card: label (uppercase muted) → value (font-mono xl) → sub-label.
+ * AC: N/A values render as — em-dash in muted color, not "N/A" text.
+ * AC: % change fields use positive/negative color; other numbers do not.
+ * AC: Skeleton shimmer while loading — same card height as loaded state.
  */
-export const MetricsGrid: React.FC<MetricsGridProps> = ({ data }) => {
+export const MetricsGrid: React.FC<MetricsGridProps> = ({ data, isLoading }) => {
+  // Skeleton loading state
+  if (isLoading || !data) {
+    return (
+      <section className="metrics-grid" aria-labelledby="metrics-heading" aria-busy="true">
+        <header className="metrics-grid__header">
+          <h2 id="metrics-heading">Key Metrics</h2>
+        </header>
+        <dl className="metrics-grid__list" aria-label="Loading financial metrics">
+          {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
+            <div key={i} className="metrics-grid__skeleton" aria-hidden="true" />
+          ))}
+        </dl>
+      </section>
+    );
+  }
+
   return (
     <section className="metrics-grid" aria-labelledby="metrics-heading">
       <header className="metrics-grid__header">
@@ -91,19 +113,31 @@ export const MetricsGrid: React.FC<MetricsGridProps> = ({ data }) => {
       </header>
 
       <dl className="metrics-grid__list" aria-label="Financial metrics">
-        {METRIC_DEFS.map(({ key, label, learnSlug, format, naReason }) => {
+        {METRIC_DEFS.map(({ key, label, learnSlug, format, naReason, isChangePct }) => {
           const rawValue = data.metrics[key];
           const isDividend = key === 'dividendYield';
           const isNA = rawValue === null || rawValue === undefined;
           const isZeroDividend = isDividend && rawValue === 0;
+          const isNegativePE = key === 'pe' && rawValue !== null && (rawValue as number) < 0;
 
           let displayValue: string;
           if (isNA) {
-            displayValue = 'N/A';
+            displayValue = '—'; // em-dash, not "N/A"
           } else if (isZeroDividend) {
             displayValue = '—';
           } else {
             displayValue = format(rawValue as number);
+          }
+
+          let valueClass = 'metrics-grid__value font-mono';
+          if (isNA || isZeroDividend) {
+            valueClass = 'metrics-grid__value--na metrics-grid__value'; // muted, no mono needed
+          } else if (isChangePct && rawValue !== null) {
+            valueClass += (rawValue as number) >= 0
+              ? ' text-positive'
+              : ' text-negative';
+          } else if (isNegativePE) {
+            valueClass += ' metrics-grid__value--negative';
           }
 
           return (
@@ -119,16 +153,15 @@ export const MetricsGrid: React.FC<MetricsGridProps> = ({ data }) => {
                 </a>
               </dt>
               <dd
-                className={`metrics-grid__value${isNA ? ' metrics-grid__value--na' : ''}${
-                  key === 'pe' && rawValue !== null && rawValue < 0
-                    ? ' metrics-grid__value--negative'
-                    : ''
-                }`}
+                className={valueClass}
                 title={isNA ? naReason : undefined}
                 aria-label={`${label}: ${displayValue}${isNA ? ` — ${naReason}` : ''}`}
               >
                 {displayValue}
               </dd>
+              <span className="metrics-grid__sublabel">
+                {data.fiscalPeriod}
+              </span>
             </div>
           );
         })}
