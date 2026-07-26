@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { IndicatorKey, IndicatorConfig, IndicatorResult, INDICATOR_CONFIGS } from '../../hooks/useIndicators';
+import { ChartRange } from '../../hooks/useOHLCV';
 import RSIPanel from './RSIPanel';
 import MACDPanel from './MACDPanel';
 import './IndicatorsPanel.css';
@@ -7,10 +8,21 @@ import './IndicatorsPanel.css';
 interface IndicatorsPanelProps {
   activeKeys: Set<IndicatorKey>;
   loadingKeys: Set<IndicatorKey>;
-  unavailableKeys: Set<IndicatorKey>;
+  /**
+   * Keys that are not available for the current time range.
+   * If `range` prop is provided, this is computed automatically and this prop
+   * is ignored. Pass explicitly only when `range` is not available.
+   */
+  unavailableKeys?: Set<IndicatorKey>;
   onToggle: (key: IndicatorKey) => void;
   /** Map of indicator data — used to render RSI/MACD sub-panels */
   data?: Map<IndicatorKey, IndicatorResult>;
+  /**
+   * Current chart range (ChartRange). Used to compute which indicators are
+   * unavailable (e.g. RSI/MACD require daily bars, not available on 1D intraday).
+   * Must be typed as ChartRange ('1d'|'5d'|'1m'|'6m'|'1y'|'5y'), NOT ChartInterval.
+   */
+  range?: ChartRange;
 }
 
 /**
@@ -25,11 +37,17 @@ interface IndicatorsPanelProps {
 export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({
   activeKeys,
   loadingKeys,
-  unavailableKeys,
+  unavailableKeys: unavailableKeysProp,
   onToggle,
   data = new Map(),
+  range,
 }) => {
   const [open, setOpen] = useState(false);
+
+  // Compute unavailable keys from range if provided; else fall back to prop
+  const unavailableKeys: Set<IndicatorKey> = range !== undefined
+    ? new Set<IndicatorKey>(range === '1d' ? ['rsi', 'macd'] as IndicatorKey[] : [])
+    : (unavailableKeysProp ?? new Set<IndicatorKey>());
 
   const rsiActive = activeKeys.has('rsi');
   const macdActive = activeKeys.has('macd');
