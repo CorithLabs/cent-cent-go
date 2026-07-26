@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Typography integration checks for tokens.css
  *
