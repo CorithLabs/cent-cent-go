@@ -17,6 +17,7 @@ type StockHandler struct {
 	indicatorSvc  *services.IndicatorService
 	metricsSvc    *services.MetricsService
 	financialsSvc *services.FinancialsService
+	eli5Svc       *services.ELI5Service
 	db            *pgxpool.Pool
 }
 
@@ -28,6 +29,7 @@ func NewStockHandler(db *pgxpool.Pool) *StockHandler {
 		indicatorSvc:  services.NewIndicatorService(db),
 		metricsSvc:    services.NewMetricsService(db),
 		financialsSvc: services.NewFinancialsService(db),
+		eli5Svc:       services.NewELI5Service(db),
 		db:            db,
 	}
 }
@@ -185,8 +187,23 @@ func (h *StockHandler) GetFinancials(c *gin.Context) {
 }
 
 // GetELI5 handles GET /api/stocks/:ticker/eli5
+// AC: Returns structured analysis object — no LLM call server-side.
+// AC: Response cached per ticker for 1 hour.
+// AC: Returns 404 for unknown tickers.
 func (h *StockHandler) GetELI5(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "not yet implemented"})
+	ticker := strings.ToUpper(c.Param("ticker"))
+
+	result, err := h.eli5Svc.GetELI5(c.Request.Context(), ticker)
+	if err != nil {
+		if services.IsNotFound(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "ticker not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate ELI5 analysis"})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // GetBatchQuotes handles GET /api/stocks/quotes?tickers=
