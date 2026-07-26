@@ -1,0 +1,192 @@
+/* WatchlistPage */
+
+.watchlist-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: var(--space-6);
+  min-height: 100vh;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────────── */
+
+.watchlist-page__header {
+  margin-bottom: var(--space-6);
+}
+
+.watchlist-page__title {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-2);
+}
+
+.watchlist-page__subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.watchlist-page__limit-warning {
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-warning);
+  background: rgba(245, 158, 11, 0.1);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* ── Empty state ────────────────────────────────────────────────────────────── */
+
+.watchlist-page__empty {
+  text-align: center;
+  padding: var(--space-12) 0;
+}
+
+.watchlist-page__empty-text {
+  font-size: var(--text-base);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-4);
+}
+
+.watchlist-page__search-cta {
+  display: inline-block;
+  padding: var(--space-3) var(--space-6);
+  background: var(--color-accent);
+  color: #fff;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.watchlist-page__search-cta:hover {
+  opacity: 0.9;
+}
+
+/* ── Table ──────────────────────────────────────────────────────────────────── */
+
+.watchlist-page__table-wrapper {
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-bg-elevated);
+}
+
+.watchlist-page__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.watchlist-page__table th {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-muted);
+  font-weight: 500;
+  padding: var(--space-2) var(--space-4);
+  text-align: left;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Row ────────────────────────────────────────────────────────────────────── */
+
+.watchlist-row td {
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-primary);
+  border-top: 1px solid var(--color-bg-elevated);
+  vertical-align: middle;
+}
+
+.watchlist-row:hover td {
+  background: var(--color-bg-elevated);
+}
+
+.watchlist-row__link {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.watchlist-row__link:hover {
+  text-decoration: underline;
+}
+
+.watchlist-row__delisted {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-negative);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.watchlist-row__loading {
+  color: var(--color-text-muted);
+}
+
+.watchlist-row__updated {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.watchlist-row__remove-btn {
+  background: none;
+  border: 1px solid var(--color-bg-elevated);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  font-family: var(--font-ui);
+  padding: var(--space-1) var(--space-3);
+  transition: all 0.15s;
+}
+
+.watchlist-row__remove-btn:hover {
+  border-color: var(--color-negative);
+  color: var(--color-negative);
+}
+
+/* ── Loading / error ────────────────────────────────────────────────────────── */
+
+.watchlist-page__skeleton {
+  height: 200px;
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-surface) 25%,
+    var(--color-bg-elevated) 50%,
+    var(--color-bg-surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--radius-md);
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.watchlist-page__error {
+  color: var(--color-negative);
+  font-size: var(--text-sm);
+  padding: var(--space-4);
+}
+
+/* ── Disclaimer ─────────────────────────────────────────────────────────────── */
+
+.watchlist-page__disclaimer {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin-top: var(--space-6);
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .watchlist-page {
+    padding: var(--space-4);
+  }
+}
