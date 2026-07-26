@@ -143,3 +143,53 @@
   border-radius: 50%;
   flex-shrink: 0;
 }
+
+/* Dashed swatch for Bollinger Bands */
+.indicators-panel__legend-dot--dashed {
+  border-radius: 0;
+  height: 2px;
+  width: 16px;
+  background: none !important;
+  border-top: 2px dashed currentColor;
+}
+
+/* ── Sub-panels (RSI, MACD) ─────────────────────────────────────────────── */
+.indicators-panel__subpanels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* Auto-expand to fit both RSI and MACD with no clipping */
+}
+
+/* Shared sub-panel wrapper */
+.indicator-subpanel {
+  background: var(--color-bg-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-bg-elevated);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  overflow: hidden;
+}
+
+.indicator-subpanel__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-1);
+}
+
+.indicator-subpanel__title {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.indicator-subpanel__legend {
+  display: flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
