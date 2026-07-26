@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/CorithLabs/cent-cent-go/internal/handlers"
 	"github.com/CorithLabs/cent-cent-go/internal/middleware"
@@ -52,7 +53,14 @@ func NewRouter(db *pgxpool.Pool) *gin.Engine {
 	api.GET("/economics/:indicator", econHandler.GetIndicator)
 
 	// Learn / concept articles
-	learnHandler := handlers.NewLearnHandler()
+	// Content path is resolved relative to the server working directory.
+	// In local dev: backend/ → ../content/learn
+	// In production: content/learn (next to the binary)
+	articlesDir := os.Getenv("LEARN_CONTENT_DIR")
+	if articlesDir == "" {
+		articlesDir = "../content/learn" // default: relative to backend/
+	}
+	learnHandler := handlers.NewLearnHandler(articlesDir)
 	api.GET("/learn", learnHandler.List)
 	api.GET("/learn/:slug", learnHandler.GetArticle)
 
