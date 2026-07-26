@@ -22,18 +22,29 @@ export interface IndicatorConfig {
   key: IndicatorKey;
   label: string;
   color: string;
+  /** True if this indicator renders as a dashed line */
+  dashed?: boolean;
   subPanel: boolean; // RSI and MACD render in a sub-panel, not overlaid
   apiIndicator: string; // maps to backend enum
   period?: number;
 }
 
+/**
+ * Indicator color palette — matched to design spec:
+ * SMA50   → #F59E0B  (amber)
+ * SMA200  → #8B5CF6  (purple)
+ * EMA20   → #06B6D4  (cyan)
+ * Bollinger → #64748B (slate, dashed)
+ * RSI     → uses --color-accent for line, overbought/oversold in panel
+ * MACD    → histogram uses --color-positive / --color-negative
+ */
 export const INDICATOR_CONFIGS: IndicatorConfig[] = [
-  { key: 'sma50',     label: 'SMA 50',         color: '#f59e0b', subPanel: false, apiIndicator: 'sma',       period: 50 },
-  { key: 'sma200',    label: 'SMA 200',         color: '#8b5cf6', subPanel: false, apiIndicator: 'sma',       period: 200 },
-  { key: 'ema20',     label: 'EMA 20',          color: '#10b981', subPanel: false, apiIndicator: 'ema',       period: 20 },
-  { key: 'bollinger', label: 'Bollinger Bands', color: '#6366f1', subPanel: false, apiIndicator: 'bollinger', period: 20 },
-  { key: 'rsi',       label: 'RSI (14)',         color: '#ef4444', subPanel: true,  apiIndicator: 'rsi',       period: 14 },
-  { key: 'macd',      label: 'MACD',             color: '#3b82f6', subPanel: true,  apiIndicator: 'macd' },
+  { key: 'sma50',     label: 'SMA 50',         color: '#F59E0B', dashed: false, subPanel: false, apiIndicator: 'sma',       period: 50  },
+  { key: 'sma200',    label: 'SMA 200',         color: '#8B5CF6', dashed: false, subPanel: false, apiIndicator: 'sma',       period: 200 },
+  { key: 'ema20',     label: 'EMA 20',          color: '#06B6D4', dashed: false, subPanel: false, apiIndicator: 'ema',       period: 20  },
+  { key: 'bollinger', label: 'Bollinger Bands', color: '#64748B', dashed: true,  subPanel: false, apiIndicator: 'bollinger', period: 20  },
+  { key: 'rsi',       label: 'RSI (14)',         color: '#3B82F6', dashed: false, subPanel: true,  apiIndicator: 'rsi',       period: 14  },
+  { key: 'macd',      label: 'MACD',             color: '#3B82F6', dashed: false, subPanel: true,  apiIndicator: 'macd'                   },
 ];
 
 interface UseIndicatorsReturn {
@@ -69,10 +80,7 @@ export function useIndicators(
       setLoadingKeys((prev) => new Set(prev).add(key));
 
       try {
-        const params = new URLSearchParams({
-          indicator: config.apiIndicator,
-          range,
-        });
+        const params = new URLSearchParams({ indicator: config.apiIndicator, range });
         if (config.period) params.set('period', String(config.period));
 
         const res = await fetch(`/api/stocks/${encodeURIComponent(ticker)}/indicators?${params}`);
@@ -110,7 +118,6 @@ export function useIndicators(
           next.delete(key);
         } else {
           next.add(key);
-          // Fetch if not already loaded
           if (!data.has(key)) {
             fetchIndicator(key);
           }
