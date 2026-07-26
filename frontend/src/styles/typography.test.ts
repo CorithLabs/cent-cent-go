@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Typography integration checks for tokens.css
  *
@@ -6,6 +7,9 @@
  * 2. --font-ui and --font-mono tokens have system-font fallbacks
  * 3. .font-mono utility uses tabular-nums for alignment of negative numbers
  * 4. Type scale tokens span xs → 3xl
+ *
+ * Runs in the Node.js environment (see @vitest-environment directive above)
+ * so that Node built-ins fs, path, and __dirname are available.
  */
 
 import { describe, it, expect } from 'vitest';
