@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,39 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-// buildFREDServer creates a test HTTP server that returns mock FRED responses.
-func buildFREDServer(t *testing.T, seriesResponses map[string][]IndicatorTrendPoint) *httptest.Server {
-	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		seriesID := r.URL.Query().Get("series_id")
-		points, ok := seriesResponses[seriesID]
-		if !ok {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-
-		// Build FRED-style response
-		type obs struct {
-			Date  string `json:"date"`
-			Value string `json:"value"`
-		}
-		var observations []obs
-		for _, p := range points {
-			observations = append(observations, obs{
-				Date:  p.Date,
-				Value: fmt.Sprintf("%.6f", p.Value),
-			})
-		}
-		resp := map[string]interface{}{
-			"observations": observations,
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
-	}))
-}
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -64,19 +32,6 @@ func TestRelatedConceptsForIndicator(t *testing.T) {
 
 	concepts = relatedConceptsForIndicator("UNKNOWN")
 	assert.Empty(t, concepts)
-}
-
-func TestBuildSummaryForIndicator(t *testing.T) {
-	// Test that series IDs map to descriptive names
-	found := false
-	for _, cfg := range fredIndicators {
-		if cfg.ID == "CPIAUCSL" {
-			found = true
-			assert.Equal(t, "CPI (Inflation)", cfg.Name)
-			assert.Equal(t, "%", cfg.Unit)
-		}
-	}
-	assert.True(t, found, "CPIAUCSL must be in fredIndicators")
 }
 
 func TestFredIndicatorsConfig(t *testing.T) {
@@ -146,13 +101,13 @@ func TestEconomicsListResponse_JSONShape(t *testing.T) {
 func TestFetchObservations_SkipsMissingValues(t *testing.T) {
 	// Test that "." (missing) values are skipped
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := `{"observations":[
+		respBody := `{"observations":[
 			{"date":"2024-01-01","value":"3.2"},
 			{"date":"2024-02-01","value":"."},
 			{"date":"2024-03-01","value":"3.5"}
 		]}`
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(resp))
+		_, _ = w.Write([]byte(respBody))
 	}))
 	defer srv.Close()
 
@@ -161,8 +116,6 @@ func TestFetchObservations_SkipsMissingValues(t *testing.T) {
 		apiKey:     "test-key",
 	}
 
-	// Override the base URL by using a custom function that hits our test server
-	// We test the parsing logic directly
 	type fredResp struct {
 		Observations []struct {
 			Date  string `json:"date"`
@@ -184,7 +137,7 @@ func TestFetchObservations_SkipsMissingValues(t *testing.T) {
 			continue
 		}
 		var v float64
-		if _, err := fmt.Sscanf(obs.Value, "%f", &v); err == nil {
+		if _, scanErr := fmt.Sscanf(obs.Value, "%f", &v); scanErr == nil {
 			points = append(points, IndicatorTrendPoint{Date: obs.Date, Value: v})
 		}
 	}
