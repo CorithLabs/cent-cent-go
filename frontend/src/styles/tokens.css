@@ -1,0 +1,123 @@
+/* ============================================================
+   DESIGN TOKENS — single source of truth for all UI values
+   Import once in src/main.tsx — do NOT import in components.
+   ============================================================ */
+
+/* Load Inter and JetBrains Mono from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap');
+
+:root {
+  /* ── Colors ─────────────────────────────────────────────────────────────── */
+
+  /* Backgrounds (dark-first) */
+  --color-bg-primary:   #0D0F14;  /* deep near-black page background */
+  --color-bg-surface:   #161B22;  /* card / panel surface */
+  --color-bg-elevated:  #1E2530;  /* elevated layer — grid lines, borders */
+
+  /* Brand / interactive */
+  --color-accent:       #3B82F6;  /* electric blue — primary CTA, active states */
+  --color-accent-dim:   rgba(59, 130, 246, 0.12); /* subtle accent tint */
+
+  /* Semantic */
+  --color-positive:     #22C55E;  /* gain / up */
+  --color-negative:     #EF4444;  /* loss / down */
+  --color-neutral:      #94A3B8;  /* neutral / warning-adjacent */
+  --color-warning:      #F59E0B;  /* warning / amber */
+
+  /* Text */
+  --color-text-primary: #F1F5F9;  /* primary body text */
+  --color-text-muted:   #64748B;  /* secondary / muted labels */
+
+  /* Legacy aliases (keep these so MVP components compile unchanged) */
+  --color-primary:          var(--color-accent);
+  --color-primary-dark:     #2563EB;
+  --color-text:             var(--color-text-primary);
+  --color-text-secondary:   var(--color-neutral);
+  --color-muted:            var(--color-text-muted);
+  --color-surface:          var(--color-bg-surface);
+  --color-surface-hover:    var(--color-bg-elevated);
+  --color-background:       var(--color-bg-primary);
+  --color-border:           var(--color-bg-elevated);
+  --color-danger:           var(--color-negative);
+  --color-success:          var(--color-positive);
+
+  /* ── Typography ─────────────────────────────────────────────────────────── */
+
+  --font-ui:   'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+
+  /* Legacy alias */
+  --font-sans: var(--font-ui);
+
+  /* Type scale (px values as px for clarity; components should use these vars) */
+  --text-xs:   11px;   /* tiny labels, legend text */
+  --text-sm:   13px;   /* secondary body, card labels */
+  --text-base: 15px;   /* primary body copy */
+  --text-md:   17px;   /* slightly larger body / sub-headings */
+  --text-lg:   20px;   /* section headings */
+  --text-xl:   24px;   /* large metric values */
+  --text-2xl:  28px;   /* page headings */
+  --text-3xl:  34px;   /* hero / stock price */
+
+  /* ── Spacing (4px base grid) ────────────────────────────────────────────── */
+
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-5:   20px;
+  --space-6:   24px;
+  --space-7:   28px;
+  --space-8:   32px;
+  --space-9:   36px;
+  --space-10:  40px;
+  --space-11:  44px;
+  --space-12:  48px;
+
+  /* ── Border radius ──────────────────────────────────────────────────────── */
+
+  --radius-sm:  4px;
+  --radius-md:  8px;
+  --radius-lg:  12px;
+  --radius-xl:  16px;
+
+  /* ── Shadows ────────────────────────────────────────────────────────────── */
+
+  --shadow-sm:       0 1px 3px rgba(0, 0, 0, 0.30);
+  --shadow-card:     0 2px 8px rgba(0, 0, 0, 0.40);
+  --shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.50);
+
+  /* Legacy aliases */
+  --shadow-md: var(--shadow-card);
+  --shadow-lg: var(--shadow-elevated);
+}
+
+/* ── Light mode stub (not fully styled in v1.5 — tokens only) ───────────── */
+@media (prefers-color-scheme: light) {
+  :root {
+    /* Swap backgrounds for a light palette — expand in v2 */
+    --color-bg-primary:   #F8FAFC;
+    --color-bg-surface:   #FFFFFF;
+    --color-bg-elevated:  #F1F5F9;
+
+    --color-text-primary: #0F172A;
+    --color-text-muted:   #64748B;
+
+    --shadow-card:        0 1px 4px rgba(0, 0, 0, 0.10);
+    --shadow-elevated:    0 4px 16px rgba(0, 0, 0, 0.14);
+  }
+}
+
+/* ── Utility classes ────────────────────────────────────────────────────── */
+
+/* Apply mono font with tabular numeric rendering to any price/metric element */
+.font-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Positive / negative color helpers */
+.text-positive { color: var(--color-positive); }
+.text-negative { color: var(--color-negative); }
+.text-muted    { color: var(--color-text-muted); }
+.text-accent   { color: var(--color-accent); }
