@@ -28,6 +28,17 @@ type ChartMode = 'line' | 'candlestick';
 
 interface PriceChartProps {
   ticker: string;
+  /**
+   * Optional controlled range. When provided, PriceChart uses this value
+   * instead of its internal state. Pair with onRangeChange to keep a parent
+   * (e.g. StockChartPage) in sync with IndicatorsPanel.
+   */
+  range?: ChartRange;
+  /**
+   * Called whenever the user clicks a range button. Required when `range` is
+   * controlled. When omitted, PriceChart self-manages range internally.
+   */
+  onRangeChange?: (range: ChartRange) => void;
 }
 
 /**
@@ -36,9 +47,27 @@ interface PriceChartProps {
  * AC: Range buttons switch data range. Toggle between line and candlestick.
  * AC: Hover tooltip shows OHLCV. Download CSV button exports visible data.
  * AC: Large datasets (5Y daily) windowed to avoid frame drops.
+ *
+ * Range can be controlled by a parent via the `range` + `onRangeChange` props,
+ * or left uncontrolled (self-managed). Both modes are backward compatible.
  */
-export const PriceChart: React.FC<PriceChartProps> = ({ ticker }) => {
-  const [range, setRange] = useState<ChartRange>('1m');
+export const PriceChart: React.FC<PriceChartProps> = ({
+  ticker,
+  range: rangeProp,
+  onRangeChange,
+}) => {
+  // Internal state used only when range is not controlled by a parent
+  const [rangeInternal, setRangeInternal] = useState<ChartRange>('1m');
+  const range = rangeProp ?? rangeInternal;
+
+  const handleRangeChange = (r: ChartRange) => {
+    if (onRangeChange) {
+      onRangeChange(r);
+    } else {
+      setRangeInternal(r);
+    }
+  };
+
   const [mode, setMode] = useState<ChartMode>('line');
 
   const { ohlcv, isLoading, error } = useOHLCV(ticker, range);
@@ -89,7 +118,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({ ticker }) => {
             <button
               key={r}
               className={`price-chart__range-btn${range === r ? ' price-chart__range-btn--active' : ''}`}
-              onClick={() => setRange(r)}
+              onClick={() => handleRangeChange(r)}
               aria-pressed={range === r}
               aria-label={`Show ${RANGE_LABELS[r]} range`}
             >
