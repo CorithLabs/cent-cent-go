@@ -83,7 +83,7 @@ func (s *StockQuoteService) getCached(ctx context.Context, ticker string) (*mode
 		new(string),
 		&quote.Price, &quote.Change, &quote.ChangePct,
 		&quote.MarketCap, &quote.Volume, &quote.Week52High, &quote.Week52Low,
-		&quote.Status, &quote.Stale, &quote.LastUpdated, &quote.Source,
+		&quote.Status, &quote.Stale, &quote.LastUpdated, &quote.DataSource,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -114,7 +114,7 @@ func (s *StockQuoteService) upsertCache(ctx context.Context, q *models.StockQuot
 		  week52_high=$7, week52_low=$8, status=$9, stale=$10,
 		  last_updated=$11, source=$12`,
 		q.Ticker, q.Price, q.Change, q.ChangePct, q.MarketCap, q.Volume,
-		q.Week52High, q.Week52Low, q.Status, q.Stale, q.LastUpdated, q.Source)
+		q.Week52High, q.Week52Low, q.Status, q.Stale, q.LastUpdated, q.DataSource)
 	return err
 }
 
@@ -230,7 +230,7 @@ func (s *StockQuoteService) fetchFromPolygon(ctx context.Context, ticker string)
 		LastUpdated: time.Now().UTC(),
 		Status:      status,
 		Stale:       false,
-		Source:      "polygon",
+		DataSource:  "polygon",
 	}
 
 	return quote, nil
