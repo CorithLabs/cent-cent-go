@@ -27,7 +27,7 @@ beforeEach(() => {
 
 describe('IncomeStatement', () => {
   it('renders the table with all 5 row labels', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => mockResponse(),
     } as Response);
@@ -44,7 +44,7 @@ describe('IncomeStatement', () => {
   });
 
   it('renders values with unit labels', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => mockResponse(),
     } as Response);
@@ -58,7 +58,7 @@ describe('IncomeStatement', () => {
   });
 
   it('toggles to chart view', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => mockResponse(),
     } as Response);
@@ -75,13 +75,13 @@ describe('IncomeStatement', () => {
   });
 
   it('shows loading state initially', () => {
-    vi.spyOn(global, 'fetch').mockReturnValue(new Promise(() => {}));
+    vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}));
     render(<IncomeStatement ticker="AAPL" />);
     expect(document.querySelector('[aria-busy="true"]')).toBeInTheDocument();
   });
 
   it('shows "No data available" when empty array returned', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => ({ ...mockResponse(), data: [] }),
     } as Response);
@@ -94,7 +94,7 @@ describe('IncomeStatement', () => {
   });
 
   it('shows "Show more" button when 4 periods loaded', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => mockResponse(4),
     } as Response);
@@ -114,7 +114,7 @@ describe('IncomeStatement', () => {
       ],
     };
 
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => dataWithGap,
     } as Response);
