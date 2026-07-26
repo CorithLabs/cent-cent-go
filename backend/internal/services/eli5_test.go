@@ -194,7 +194,7 @@ func TestBuildSections_AllNegative_SentimentIsNegative(t *testing.T) {
 		Ticker:       "BADCO",
 		FiscalPeriod: "Q2 2024",
 		LastUpdated:  "2024-07-01",
-		Metrics: MetricsValues{
+		Metrics: FundamentalMetrics{
 			PE:           &pe,
 			EPS:          &eps,
 			DebtToEquity: &de,
@@ -216,7 +216,7 @@ func TestBuildSections_DividendSectionOmittedWhenZero(t *testing.T) {
 	metrics := &MetricsResponse{
 		Ticker:      "NODIV",
 		LastUpdated: "2024-07-01",
-		Metrics: MetricsValues{
+		Metrics: FundamentalMetrics{
 			DividendYield: &yield,
 		},
 	}
@@ -236,7 +236,7 @@ func TestBuildSections_MissingMetricSkipped(t *testing.T) {
 	metrics := &MetricsResponse{
 		Ticker:      "SPARSE",
 		LastUpdated: "2024-07-01",
-		Metrics: MetricsValues{
+		Metrics: FundamentalMetrics{
 			PE: &pe,
 		},
 	}
@@ -253,7 +253,7 @@ func TestBuildSections_NoDividendSectionWhenNil(t *testing.T) {
 	metrics := &MetricsResponse{
 		Ticker:      "NODIV2",
 		LastUpdated: "2024-07-01",
-		Metrics:     MetricsValues{}, // all nil
+		Metrics:     FundamentalMetrics{}, // all nil
 	}
 
 	sections, _ := svc.buildSections(metrics)

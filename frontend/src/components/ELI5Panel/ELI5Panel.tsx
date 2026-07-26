@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useELI5, ELI5Response, ELI5Section } from '../../hooks/useELI5';
+import { useELI5, ELI5Section } from '../../hooks/useELI5';
 import {
   isChromeAIAvailable,
   generateELI5Narrative,

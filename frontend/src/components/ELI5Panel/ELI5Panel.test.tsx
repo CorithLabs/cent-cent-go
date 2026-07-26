@@ -43,13 +43,13 @@ const renderPanel = () =>
 
 describe('ELI5Panel', () => {
   it('shows loading skeleton initially', () => {
-    vi.spyOn(global, 'fetch').mockReturnValue(new Promise(() => {}));
+    vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}));
     renderPanel();
     expect(document.querySelector('[aria-busy="true"]')).toBeInTheDocument();
   });
 
   it('renders sentiment badge with icon and label', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => mockELI5Response,
     } as Response);
@@ -63,7 +63,7 @@ describe('ELI5Panel', () => {
   });
 
   it('renders section cards with emoji and fallback label (no window.ai)', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => mockELI5Response,
     } as Response);
@@ -78,7 +78,7 @@ describe('ELI5Panel', () => {
   });
 
   it('shows "Upgrade to Chrome 127+" notice when window.ai is unavailable', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => mockELI5Response,
     } as Response);
@@ -91,7 +91,7 @@ describe('ELI5Panel', () => {
   });
 
   it('expands and collapses section detail on click', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => mockELI5Response,
     } as Response);
@@ -118,7 +118,7 @@ describe('ELI5Panel', () => {
   });
 
   it('shows "data as of" date and Learn link', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => mockELI5Response,
     } as Response);
@@ -132,7 +132,7 @@ describe('ELI5Panel', () => {
   });
 
   it('shows limited data notice when sections are empty', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => ({ ...mockELI5Response, sections: [] }),
     } as Response);
@@ -145,7 +145,7 @@ describe('ELI5Panel', () => {
   });
 
   it('shows error state gracefully — never blank', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: false,
       status: 500,
       json: async () => ({ error: 'Internal server error' }),
@@ -159,7 +159,7 @@ describe('ELI5Panel', () => {
   });
 
   it('returns null (no panel) for 404 ticker', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: false,
       status: 404,
       json: async () => ({ error: 'ticker not found' }),
