@@ -3,7 +3,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 /* Toggle button */
@@ -11,20 +11,20 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
-  font-size: 0.875rem;
+  padding: 6px var(--space-4);
+  font-size: var(--text-sm);
   font-weight: 500;
-  background: var(--color-surface);
-  border: 1.5px solid var(--color-border);
+  background: var(--color-bg-surface);
+  border: 1.5px solid var(--color-bg-elevated);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  color: var(--color-text);
+  color: var(--color-text-primary);
   transition: background 0.1s ease;
 }
 
 .indicators-panel__toggle:hover,
 .indicators-panel__toggle--open {
-  background: var(--color-background);
+  background: var(--color-bg-elevated);
 }
 
 .indicators-panel__badge {
@@ -33,10 +33,10 @@
   justify-content: center;
   width: 18px;
   height: 18px;
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 700;
-  background: var(--color-primary);
-  color: white;
+  background: var(--color-accent);
+  color: var(--color-text-primary);
   border-radius: 50%;
 }
 
@@ -45,11 +45,11 @@
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  background: var(--color-surface);
-  border: 1.5px solid var(--color-border);
+  background: var(--color-bg-surface);
+  border: 1.5px solid var(--color-bg-elevated);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
-  padding: 8px;
+  box-shadow: var(--shadow-elevated);
+  padding: var(--space-2);
   z-index: 50;
   min-width: 220px;
 }
@@ -62,24 +62,25 @@
 .indicators-panel__indicator-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
-  padding: 8px 10px;
-  font-size: 0.875rem;
+  padding: var(--space-2) 10px;
+  font-size: var(--text-sm);
   background: transparent;
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
   text-align: left;
   transition: background 0.1s ease;
+  color: var(--color-text-primary);
 }
 
 .indicators-panel__indicator-btn:hover:not(:disabled) {
-  background: var(--color-surface-hover);
+  background: var(--color-bg-elevated);
 }
 
 .indicators-panel__indicator-btn--active {
-  background: var(--color-background);
+  background: var(--color-bg-elevated);
   font-weight: 600;
 }
 
@@ -103,8 +104,8 @@
   display: inline-block;
   width: 12px;
   height: 12px;
-  border: 2px solid var(--color-border);
-  border-top-color: var(--color-primary);
+  border: 2px solid var(--color-bg-elevated);
+  border-top-color: var(--color-accent);
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 }
@@ -114,8 +115,8 @@
 }
 
 .indicators-panel__unavailable-badge {
-  font-size: 0.6875rem;
-  color: var(--color-muted);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
   white-space: nowrap;
 }
 
@@ -123,16 +124,17 @@
 .indicators-panel__legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 4px;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
 }
 
 .indicators-panel__legend-item {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-neutral);
 }
 
 .indicators-panel__legend-dot {
@@ -140,4 +142,54 @@
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+/* Dashed swatch for Bollinger Bands */
+.indicators-panel__legend-dot--dashed {
+  border-radius: 0;
+  height: 2px;
+  width: 16px;
+  background: none !important;
+  border-top: 2px dashed currentColor;
+}
+
+/* ── Sub-panels (RSI, MACD) ─────────────────────────────────────────────── */
+.indicators-panel__subpanels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* Auto-expand to fit both RSI and MACD with no clipping */
+}
+
+/* Shared sub-panel wrapper */
+.indicator-subpanel {
+  background: var(--color-bg-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-bg-elevated);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  overflow: hidden;
+}
+
+.indicator-subpanel__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-1);
+}
+
+.indicator-subpanel__title {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.indicator-subpanel__legend {
+  display: flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
 }

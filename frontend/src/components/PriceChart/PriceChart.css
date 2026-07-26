@@ -1,24 +1,24 @@
 /* ── PriceChart ────────────────────────────────────────────────────────────── */
 .price-chart {
-  background: var(--color-surface);
+  background: var(--color-bg-surface);
   border-radius: var(--radius-lg);
-  padding: 20px;
-  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-card);
 }
 
 /* Toolbar */
 .price-chart__toolbar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   flex-wrap: wrap;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .price-chart__title {
-  font-size: 1rem;
+  font-size: var(--text-base);
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text-primary);
   flex-shrink: 0;
 }
 
@@ -29,68 +29,68 @@
 }
 
 .price-chart__range-btn {
-  padding: 4px 10px;
-  font-size: 0.8125rem;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
   font-weight: 500;
   background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-bg-elevated);
+  border-radius: 99px;
   cursor: pointer;
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
   transition: all 0.1s ease;
 }
 
 .price-chart__range-btn:hover {
-  background: var(--color-surface-hover);
-  color: var(--color-text);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
 }
 
 .price-chart__range-btn--active {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: white;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-text-primary);
 }
 
 /* Mode toggle */
 .price-chart__mode-toggle {
   display: flex;
   gap: 2px;
-  margin-left: 8px;
+  margin-left: var(--space-2);
 }
 
 .price-chart__mode-btn {
-  padding: 4px 10px;
-  font-size: 0.8125rem;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
   background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-bg-elevated);
+  border-radius: 99px;
   cursor: pointer;
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
 }
 
 .price-chart__mode-btn--active {
-  background: var(--color-text);
-  border-color: var(--color-text);
-  color: white;
+  background: var(--color-bg-elevated);
+  border-color: var(--color-neutral);
+  color: var(--color-text-primary);
 }
 
 /* Download button */
 .price-chart__download-btn {
   margin-left: auto;
-  padding: 6px 14px;
-  font-size: 0.8125rem;
+  padding: 6px var(--space-4);
+  font-size: var(--text-sm);
   font-weight: 500;
   background: transparent;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-bg-elevated);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
   transition: all 0.15s ease;
 }
 
 .price-chart__download-btn:hover:not(:disabled) {
-  background: var(--color-surface-hover);
-  color: var(--color-text);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
 }
 
 .price-chart__download-btn:disabled {
@@ -112,14 +112,14 @@
 .price-chart__skeleton {
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background: linear-gradient(90deg, var(--color-bg-elevated) 25%, var(--color-bg-surface) 50%, var(--color-bg-elevated) 75%);
   background-size: 200% 100%;
   border-radius: var(--radius-md);
   animation: shimmer 1.5s infinite;
 }
 
 @keyframes shimmer {
-  0% { background-position: 200% 0; }
+  0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
 
@@ -130,86 +130,95 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-muted);
-  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+  font-size: var(--text-base);
 }
 
 .price-chart__error {
-  color: var(--color-danger);
+  color: var(--color-negative);
 }
 
 /* Notice */
 .price-chart__notice {
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-  background: var(--color-background);
-  padding: 8px 12px;
+  font-size: var(--text-sm);
+  color: var(--color-neutral);
+  background: var(--color-bg-elevated);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
-/* Tooltip */
+/* Custom Tooltip */
 .price-chart__tooltip {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-bg-elevated);
   border-radius: var(--radius-md);
-  padding: 10px 14px;
-  box-shadow: var(--shadow-md);
-  font-size: 0.8125rem;
+  padding: 10px var(--space-4);
+  box-shadow: var(--shadow-elevated);
+  font-size: var(--text-sm);
 }
 
 .price-chart__tooltip-date {
   font-weight: 600;
-  margin-bottom: 6px;
-  color: var(--color-text);
+  margin-bottom: var(--space-2);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
 }
 
 .price-chart__tooltip dl {
   display: grid;
   grid-template-columns: auto auto;
-  gap: 2px 12px;
+  gap: 2px var(--space-3);
 }
 
 .price-chart__tooltip dt {
-  color: var(--color-muted);
+  color: var(--color-text-muted);
 }
 
 .price-chart__tooltip dd {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-weight: 500;
+  color: var(--color-text-primary);
 }
 
 /* Accessible table */
 .price-chart__accessible-table {
-  margin-top: 16px;
-  font-size: 0.8125rem;
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
 }
 
 .price-chart__accessible-table summary {
   cursor: pointer;
-  color: var(--color-muted);
-  padding: 4px 0;
+  color: var(--color-text-muted);
+  padding: var(--space-1) 0;
 }
 
 .price-chart__accessible-table table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 .price-chart__accessible-table th,
 .price-chart__accessible-table td {
   text-align: right;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--color-border);
-  font-size: 0.8125rem;
+  padding: 6px var(--space-2);
+  border-bottom: 1px solid var(--color-bg-elevated);
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
 }
 
 .price-chart__accessible-table th:first-child,
 .price-chart__accessible-table td:first-child {
   text-align: left;
+  font-family: var(--font-ui);
 }
 
 .price-chart__accessible-table th {
   font-weight: 600;
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
 }

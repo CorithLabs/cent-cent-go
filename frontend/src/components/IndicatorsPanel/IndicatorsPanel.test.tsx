@@ -1,11 +1,42 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { IndicatorsPanel } from './IndicatorsPanel';
-import { IndicatorKey } from '../../hooks/useIndicators';
+import { IndicatorKey, IndicatorResult } from '../../hooks/useIndicators';
+
+// Mock Recharts components for non-browser environment
+vi.mock('recharts', async () => {
+  const actual = await vi.importActual<typeof import('recharts')>('recharts');
+  const Noop: React.FC<{ children?: React.ReactNode }> = ({ children }) => <>{children}</>;
+  return {
+    ...actual,
+    ResponsiveContainer: Noop,
+    LineChart: Noop,
+    ComposedChart: Noop,
+    Line: () => null,
+    Bar: () => null,
+    Area: () => null,
+    XAxis: () => null,
+    YAxis: () => null,
+    CartesianGrid: () => null,
+    ReferenceLine: () => null,
+    Tooltip: () => null,
+    Cell: () => null,
+  };
+});
 
 const noop = () => {};
 
-describe('IndicatorsPanel', () => {
+const makeMockData = (key: IndicatorKey): IndicatorResult => ({
+  indicator: key,
+  data: Array.from({ length: 10 }, (_, i) => ({
+    timestamp: new Date(Date.now() - i * 86400000).toISOString(),
+    value: 50 + i,
+    histogram: i % 2 === 0 ? 0.5 : -0.3,
+    signal: 49 + i,
+  })),
+});
+
+describe('IndicatorsPanel — themed', () => {
   it('renders the Indicators toggle button', () => {
     render(
       <IndicatorsPanel
@@ -18,7 +49,7 @@ describe('IndicatorsPanel', () => {
     expect(screen.getByRole('button', { name: /indicators/i })).toBeInTheDocument();
   });
 
-  it('opens the dropdown when toggle is clicked', () => {
+  it('opens the dropdown and shows all 6 indicators', () => {
     render(
       <IndicatorsPanel
         activeKeys={new Set()}
@@ -27,11 +58,13 @@ describe('IndicatorsPanel', () => {
         onToggle={noop}
       />
     );
-    const btn = screen.getByRole('button', { name: /indicators/i });
-    fireEvent.click(btn);
+    fireEvent.click(screen.getByRole('button', { name: /indicators/i }));
     expect(screen.getByText('SMA 50')).toBeInTheDocument();
-    expect(screen.getByText('MACD')).toBeInTheDocument();
+    expect(screen.getByText('SMA 200')).toBeInTheDocument();
+    expect(screen.getByText('EMA 20')).toBeInTheDocument();
+    expect(screen.getByText('Bollinger Bands')).toBeInTheDocument();
     expect(screen.getByText('RSI (14)')).toBeInTheDocument();
+    expect(screen.getByText('MACD')).toBeInTheDocument();
   });
 
   it('calls onToggle when an indicator is clicked', () => {
@@ -62,7 +95,7 @@ describe('IndicatorsPanel', () => {
     expect(screen.getByLabelText('2 active')).toBeInTheDocument();
   });
 
-  it('disables unavailable indicators and shows tooltip', () => {
+  it('disables unavailable indicators (RSI/MACD on 1D)', () => {
     render(
       <IndicatorsPanel
         activeKeys={new Set()}
@@ -72,11 +105,11 @@ describe('IndicatorsPanel', () => {
       />
     );
     fireEvent.click(screen.getByRole('button', { name: /indicators/i }));
-    const rsiBtn = screen.getByRole('button', { name: /RSI/i });
-    expect(rsiBtn).toBeDisabled();
+    expect(screen.getByRole('button', { name: /RSI/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /MACD/i })).toBeDisabled();
   });
 
-  it('shows legend for active indicators', () => {
+  it('shows legend for active indicators with --font-mono class', () => {
     const active = new Set<IndicatorKey>(['sma50']);
     render(
       <IndicatorsPanel
@@ -86,8 +119,61 @@ describe('IndicatorsPanel', () => {
         onToggle={noop}
       />
     );
-    expect(screen.getByLabelText('Active indicators legend')).toBeInTheDocument();
-    expect(screen.getAllByText('SMA 50').length).toBeGreaterThan(0);
+    const legend = screen.getByLabelText('Active indicators legend');
+    expect(legend).toBeInTheDocument();
+    // Legend items use --font-mono via .indicators-panel__legend-item class
+    const legendItem = legend.querySelector('.indicators-panel__legend-item');
+    expect(legendItem).toBeInTheDocument();
+  });
+
+  it('renders RSI sub-panel when RSI is active and data provided', () => {
+    const data = new Map<IndicatorKey, IndicatorResult>();
+    data.set('rsi', makeMockData('rsi'));
+
+    render(
+      <IndicatorsPanel
+        activeKeys={new Set<IndicatorKey>(['rsi'])}
+        loadingKeys={new Set()}
+        unavailableKeys={new Set()}
+        onToggle={noop}
+        data={data}
+      />
+    );
+    expect(screen.getByRole('img', { name: /RSI.*sub-chart/i })).toBeInTheDocument();
+  });
+
+  it('renders MACD sub-panel when MACD is active and data provided', () => {
+    const data = new Map<IndicatorKey, IndicatorResult>();
+    data.set('macd', makeMockData('macd'));
+
+    render(
+      <IndicatorsPanel
+        activeKeys={new Set<IndicatorKey>(['macd'])}
+        loadingKeys={new Set()}
+        unavailableKeys={new Set()}
+        onToggle={noop}
+        data={data}
+      />
+    );
+    expect(screen.getByRole('img', { name: /MACD.*sub-chart/i })).toBeInTheDocument();
+  });
+
+  it('renders both sub-panels when RSI + MACD are both active', () => {
+    const data = new Map<IndicatorKey, IndicatorResult>();
+    data.set('rsi', makeMockData('rsi'));
+    data.set('macd', makeMockData('macd'));
+
+    render(
+      <IndicatorsPanel
+        activeKeys={new Set<IndicatorKey>(['rsi', 'macd'])}
+        loadingKeys={new Set()}
+        unavailableKeys={new Set()}
+        onToggle={noop}
+        data={data}
+      />
+    );
+    expect(screen.getByRole('img', { name: /RSI/i })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /MACD/i })).toBeInTheDocument();
   });
 
   it('closes dropdown when toggle is clicked again', () => {

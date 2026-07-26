@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { IndicatorKey, IndicatorConfig, INDICATOR_CONFIGS } from '../../hooks/useIndicators';
+import { IndicatorKey, IndicatorConfig, IndicatorResult, INDICATOR_CONFIGS } from '../../hooks/useIndicators';
+import RSIPanel from './RSIPanel';
+import MACDPanel from './MACDPanel';
 import './IndicatorsPanel.css';
 
 interface IndicatorsPanelProps {
@@ -7,25 +9,36 @@ interface IndicatorsPanelProps {
   loadingKeys: Set<IndicatorKey>;
   unavailableKeys: Set<IndicatorKey>;
   onToggle: (key: IndicatorKey) => void;
+  /** Map of indicator data — used to render RSI/MACD sub-panels */
+  data?: Map<IndicatorKey, IndicatorResult>;
 }
 
 /**
  * IndicatorsPanel — toggle panel for technical indicators.
+ *
  * AC: "Indicators" button opens panel with SMA 50, SMA 200, EMA 20, Bollinger, RSI, MACD.
- * AC: Toggling on fetches and overlays data.
- * AC: Color-coded legend for active indicators.
- * AC: "Not available for this range" tooltip for unavailable indicators.
+ * AC: Each active indicator shows colored swatch + label using --font-mono --text-xs.
+ * AC: Bollinger Bands swatch is dashed (#64748B).
+ * AC: RSI overbought/oversold lines and MACD histogram rendered in sub-panels.
+ * AC: Panel height auto-expands when RSI + MACD are both active — no content clipping.
  */
 export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({
   activeKeys,
   loadingKeys,
   unavailableKeys,
   onToggle,
+  data = new Map(),
 }) => {
   const [open, setOpen] = useState(false);
 
+  const rsiActive = activeKeys.has('rsi');
+  const macdActive = activeKeys.has('macd');
+  const rsiData = data.get('rsi')?.data ?? [];
+  const macdData = data.get('macd')?.data ?? [];
+
   return (
     <div className="indicators-panel">
+      {/* ── Toggle button ─────────────────────────────────────────────── */}
       <button
         className={`indicators-panel__toggle${open ? ' indicators-panel__toggle--open' : ''}`}
         onClick={() => setOpen((v) => !v)}
@@ -41,8 +54,14 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({
         <span aria-hidden="true">{open ? '▲' : '▼'}</span>
       </button>
 
+      {/* ── Dropdown ──────────────────────────────────────────────────── */}
       {open && (
-        <div id="indicators-list" className="indicators-panel__dropdown" role="group" aria-label="Technical indicators">
+        <div
+          id="indicators-list"
+          className="indicators-panel__dropdown"
+          role="group"
+          aria-label="Technical indicators"
+        >
           {INDICATOR_CONFIGS.map((config: IndicatorConfig) => {
             const isActive = activeKeys.has(config.key);
             const isLoading = loadingKeys.has(config.key);
@@ -58,12 +77,20 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({
                   disabled={isUnavailable}
                   title={isUnavailable ? 'Not available for this time range' : undefined}
                 >
-                  {/* Color swatch */}
-                  <span
-                    className="indicators-panel__color-dot"
-                    style={{ background: isActive ? config.color : 'var(--color-border)' }}
-                    aria-hidden="true"
-                  />
+                  {/* Color swatch — dashed for Bollinger */}
+                  {config.dashed ? (
+                    <span
+                      className="indicators-panel__color-dot indicators-panel__legend-dot--dashed"
+                      style={{ color: isActive ? config.color : 'var(--color-bg-elevated)' }}
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <span
+                      className="indicators-panel__color-dot"
+                      style={{ background: isActive ? config.color : 'var(--color-bg-elevated)' }}
+                      aria-hidden="true"
+                    />
+                  )}
                   <span className="indicators-panel__label">{config.label}</span>
                   {isLoading && <span className="indicators-panel__spinner" aria-label="Loading" />}
                   {isUnavailable && (
@@ -78,19 +105,39 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({
         </div>
       )}
 
-      {/* Active legend below the chart toolbar */}
+      {/* ── Active legend ─────────────────────────────────────────────── */}
       {activeKeys.size > 0 && (
         <div className="indicators-panel__legend" aria-label="Active indicators legend">
           {INDICATOR_CONFIGS.filter((c) => activeKeys.has(c.key)).map((config) => (
             <span key={config.key} className="indicators-panel__legend-item">
-              <span
-                className="indicators-panel__legend-dot"
-                style={{ background: config.color }}
-                aria-hidden="true"
-              />
+              {config.dashed ? (
+                <span
+                  className="indicators-panel__legend-dot indicators-panel__legend-dot--dashed"
+                  style={{ color: config.color }}
+                  aria-hidden="true"
+                />
+              ) : (
+                <span
+                  className="indicators-panel__legend-dot"
+                  style={{ background: config.color }}
+                  aria-hidden="true"
+                />
+              )}
               <span>{config.label}</span>
             </span>
           ))}
+        </div>
+      )}
+
+      {/* ── Sub-panels for RSI / MACD ─────────────────────────────────── */}
+      {(rsiActive || macdActive) && (
+        <div className="indicators-panel__subpanels">
+          {rsiActive && rsiData.length > 0 && (
+            <RSIPanel data={rsiData} height={macdActive ? 100 : 120} />
+          )}
+          {macdActive && macdData.length > 0 && (
+            <MACDPanel data={macdData} height={rsiActive ? 100 : 120} />
+          )}
         </div>
       )}
     </div>

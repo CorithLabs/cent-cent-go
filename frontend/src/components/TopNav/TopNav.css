@@ -1,50 +1,51 @@
 /* ── TopNav ──────────────────────────────────────────────────────── */
+/* NOTE: TopNav is ONLY rendered on desktop (>=1024px) by AppShell.
+   On mobile, AppShell shows the bottom nav + floating search button. */
+
 .top-nav {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   height: 64px;
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-surface);
+  border-bottom: 1px solid var(--color-bg-elevated);
   z-index: 50;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-card);
 }
 
 .top-nav__inner {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: var(--space-6);
   height: 100%;
   max-width: 1280px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 var(--space-6);
 }
 
 /* Logo */
 .top-nav__logo {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   text-decoration: none;
   flex-shrink: 0;
 }
 
-.top-nav__logo:hover {
-  text-decoration: none;
-}
+.top-nav__logo:hover { text-decoration: none; }
 
 .top-nav__logo-mark {
-  font-size: 1.5rem;
+  font-size: var(--text-xl);
   font-weight: 800;
-  color: var(--color-primary);
+  color: var(--color-accent);
   letter-spacing: -0.02em;
 }
 
 .top-nav__logo-text {
-  font-size: 0.9375rem;
+  font-size: var(--text-base);
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text-primary);
 }
 
 /* Search */
@@ -57,7 +58,7 @@
 .top-nav__links {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   list-style: none;
   margin-left: auto;
   flex-shrink: 0;
@@ -65,33 +66,27 @@
 
 .top-nav__link {
   display: inline-block;
-  padding: 6px 12px;
-  font-size: 0.875rem;
+  padding: 6px var(--space-3);
+  font-size: var(--text-sm);
   font-weight: 500;
-  color: var(--color-text-secondary);
+  color: var(--color-neutral);
   border-radius: var(--radius-sm);
   transition: color 0.15s ease, background 0.15s ease;
   text-decoration: none;
 }
 
 .top-nav__link:hover {
-  color: var(--color-text);
-  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+  background: var(--color-bg-elevated);
   text-decoration: none;
 }
 
 .top-nav__link--active {
-  color: var(--color-primary);
-  background: rgba(59, 130, 246, 0.08);
+  color: var(--color-accent);
+  background: var(--color-accent-dim);
 }
 
-/* Responsive: hide link text on small screens, keep icons if added later */
 @media (max-width: 768px) {
-  .top-nav__links {
-    display: none;
-  }
-
-  .top-nav__search {
-    max-width: 100%;
-  }
+  .top-nav__links { display: none; }
+  .top-nav__search { max-width: 100%; }
 }
