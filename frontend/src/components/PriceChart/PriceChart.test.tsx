@@ -32,7 +32,7 @@ beforeEach(() => {
 
 describe('PriceChart', () => {
   it('renders range selector buttons', () => {
-    vi.spyOn(global, 'fetch').mockReturnValue(new Promise(() => {}));
+    vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}));
     renderChart();
     ['1D', '5D', '1M', '6M', '1Y', '5Y'].forEach((label) => {
       expect(screen.getByRole('button', { name: new RegExp(label, 'i') })).toBeInTheDocument();
@@ -40,20 +40,20 @@ describe('PriceChart', () => {
   });
 
   it('renders line/candlestick toggle buttons', () => {
-    vi.spyOn(global, 'fetch').mockReturnValue(new Promise(() => {}));
+    vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}));
     renderChart();
     expect(screen.getByRole('button', { name: /line/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /candlestick/i })).toBeInTheDocument();
   });
 
   it('shows loading state initially', () => {
-    vi.spyOn(global, 'fetch').mockReturnValue(new Promise(() => {}));
+    vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}));
     renderChart();
     expect(document.querySelector('[aria-busy="true"]')).toBeInTheDocument();
   });
 
   it('renders chart and download button after data loads', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => mockOHLCV,
     } as Response);
@@ -61,19 +61,19 @@ describe('PriceChart', () => {
     renderChart();
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /download csv/i })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: /download.*csv/i })).not.toBeDisabled();
     });
   });
 
   it('disables download button when no data', () => {
-    vi.spyOn(global, 'fetch').mockReturnValue(new Promise(() => {}));
+    vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}));
     renderChart();
-    const btn = screen.getByRole('button', { name: /download csv/i });
+    const btn = screen.getByRole('button', { name: /download.*csv/i });
     expect(btn).toBeDisabled();
   });
 
   it('shows error message on fetch failure', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: false,
       status: 400,
       json: async () => ({ error: 'Invalid range/interval combination' }),
@@ -87,7 +87,7 @@ describe('PriceChart', () => {
   });
 
   it('changes range on button click', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => mockOHLCV,
     } as Response);
