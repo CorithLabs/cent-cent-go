@@ -1,9 +1,13 @@
+// @vitest-environment node
 /**
  * Unit test for src/styles/tokens.css
  *
  * Verifies all required design-token names are declared. The test
  * deliberately avoids asserting resolved values — only names matter,
  * so a colour rename stays local to tokens.css.
+ *
+ * Runs in the Node.js environment (see @vitest-environment directive above)
+ * so that Node built-ins fs, path, and __dirname are available.
  */
 
 import { describe, it, expect } from 'vitest';
