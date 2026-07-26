@@ -1,8 +1,19 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts';
 import { EconomicIndicator } from '../../hooks/useEconomics';
+import { ConceptSlideOver, useConceptLinkAvailability } from '../ConceptSlideOver/ConceptSlideOver';
 import './EconomicsGrid.css';
+
+// ── Indicator → concept slug mapping ─────────────────────────────────────────
+
+const INDICATOR_CONCEPT_SLUGS: Record<string, string> = {
+  GDPC1: 'gdp',
+  CPIAUCSL: 'inflation',
+  FEDFUNDS: 'monetary-policy',
+  UNRATE: 'unemployment',
+  DGS10: 'yield-curve',
+};
 
 // ── Plain-English summary generator ──────────────────────────────────────────
 
@@ -21,7 +32,6 @@ function buildSummary(indicator: EconomicIndicator): string {
     case 'DGS10':
       return `The 10-Year Treasury Yield is ${value.toFixed(2)}${unit}, ${direction} from ${absPrev.toFixed(2)}${unit}.`;
     default:
-      // Generic for GDPC1 and others
       return `${name} is at ${value.toFixed(1)} ${unit}, ${direction} from the prior period.`;
   }
 }
@@ -75,10 +85,21 @@ interface IndicatorCardProps {
 
 const IndicatorCard: React.FC<IndicatorCardProps> = ({ indicator }) => {
   const { id, name, value, unit, change, trend, lastUpdated, nextRelease, source, stale } = indicator;
+  const [slideOverOpen, setSlideOverOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const isPositive = change >= 0;
   const prevValue = value - change;
   const pending = !lastUpdated || new Date(lastUpdated).getTime() === 0;
   const summary = buildSummary(indicator);
+
+  const conceptSlug = INDICATOR_CONCEPT_SLUGS[id];
+  const conceptAvailable = useConceptLinkAvailability(conceptSlug ?? '');
+
+  const handleOpenSlideOver = () => setSlideOverOpen(true);
+  const handleCloseSlideOver = () => {
+    setSlideOverOpen(false);
+    triggerRef.current?.focus();
+  };
 
   return (
     <article
@@ -126,6 +147,19 @@ const IndicatorCard: React.FC<IndicatorCardProps> = ({ indicator }) => {
 
       <p className="economics-card__summary">{summary}</p>
 
+      {/* AC: 'Learn more' contextual link — only rendered if article exists */}
+      {conceptSlug && conceptAvailable && (
+        <button
+          ref={triggerRef}
+          className="economics-card__learn-btn"
+          onClick={handleOpenSlideOver}
+          type="button"
+          aria-label={`Learn more about ${name}`}
+        >
+          Learn more →
+        </button>
+      )}
+
       <footer className="economics-card__footer">
         {nextRelease && (
           <p className="economics-card__next-release">
@@ -150,6 +184,14 @@ const IndicatorCard: React.FC<IndicatorCardProps> = ({ indicator }) => {
       >
         View details →
       </Link>
+
+      {slideOverOpen && conceptSlug && (
+        <ConceptSlideOver
+          slug={conceptSlug}
+          label={`Learn: ${name}`}
+          onClose={handleCloseSlideOver}
+        />
+      )}
     </article>
   );
 };
@@ -162,12 +204,7 @@ interface EconomicsGridProps {
 
 /**
  * EconomicsGrid renders a grid of macro indicator cards.
- * Each card shows: current value, previous value, change, trend sparkline (1Y),
- * next release date, and a plain-English summary sentence.
- *
- * AC: /economics shows a grid of macro indicator cards.
- * AC: Each card links to its detail page.
- * AC: Failed fetch for one indicator does not break the rest.
+ * AC: On Economics indicator cards, a 'Learn more' link opens ConceptSlideOver.
  */
 export const EconomicsGrid: React.FC<EconomicsGridProps> = ({ indicators }) => (
   <section
