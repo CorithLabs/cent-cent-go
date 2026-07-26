@@ -40,13 +40,13 @@ beforeEach(() => {
 
 describe('StockDetailPage', () => {
   it('renders loading state initially', () => {
-    vi.spyOn(global, 'fetch').mockReturnValue(new Promise(() => {}));
+    vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}));
     renderPage();
     expect(document.querySelector('[aria-busy="true"]')).toBeInTheDocument();
   });
 
   it('renders stock header with all fields after successful fetch', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       status: 200,
       json: async () => mockQuote,
@@ -71,7 +71,7 @@ describe('StockDetailPage', () => {
   });
 
   it('uppercases the ticker from the URL', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       status: 200,
       json: async () => mockQuote,
@@ -81,12 +81,12 @@ describe('StockDetailPage', () => {
 
     await waitFor(() => {
       // Verify fetch was called with uppercase ticker
-      expect((global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatch(/AAPL/);
+      expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatch(/AAPL/);
     });
   });
 
   it('shows "Stock not found" for unknown ticker', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: false,
       status: 404,
       json: async () => ({ error: 'ticker not found' }),
@@ -100,7 +100,7 @@ describe('StockDetailPage', () => {
   });
 
   it('shows stale data warning when data is >15 min old', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       status: 200,
       json: async () => staleQuote,
@@ -114,7 +114,7 @@ describe('StockDetailPage', () => {
   });
 
   it('shows "Market closed" badge for suspended status', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       status: 200,
       json: async () => ({ ...mockQuote, status: 'suspended' }),

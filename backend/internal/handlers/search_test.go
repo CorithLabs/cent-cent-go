@@ -40,7 +40,7 @@ func TestSearchHandler_MissingQuery_Returns400(t *testing.T) {
 
 func TestSearchHandler_WhitespaceOnly_Returns400(t *testing.T) {
 	r := setupSearchRouter()
-	req := httptest.NewRequest(http.MethodGet, "/api/search?q=   ", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/search?q=%20%20%20", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
