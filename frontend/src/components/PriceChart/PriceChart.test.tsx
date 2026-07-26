@@ -30,8 +30,8 @@ beforeEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('PriceChart', () => {
-  it('renders range selector buttons', () => {
+describe('PriceChart — themed Recharts', () => {
+  it('renders range selector pill buttons', () => {
     vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}));
     renderChart();
     ['1D', '5D', '1M', '6M', '1Y', '5Y'].forEach((label) => {
@@ -39,20 +39,28 @@ describe('PriceChart', () => {
     });
   });
 
-  it('renders line/candlestick toggle buttons', () => {
+  it('1M range button is active by default (aria-pressed=true)', () => {
+    vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}));
+    renderChart();
+    const btn1M = screen.getByRole('button', { name: /Show 1M range/i });
+    expect(btn1M).toHaveAttribute('aria-pressed', 'true');
+    expect(btn1M.className).toContain('--active');
+  });
+
+  it('renders line / candle mode toggle', () => {
     vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}));
     renderChart();
     expect(screen.getByRole('button', { name: /line/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /candlestick/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /candle/i })).toBeInTheDocument();
   });
 
-  it('shows loading state initially', () => {
+  it('shows loading skeleton initially', () => {
     vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}));
     renderChart();
     expect(document.querySelector('[aria-busy="true"]')).toBeInTheDocument();
   });
 
-  it('renders chart and download button after data loads', async () => {
+  it('renders chart and enables download button after data loads', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => mockOHLCV,
@@ -68,11 +76,10 @@ describe('PriceChart', () => {
   it('disables download button when no data', () => {
     vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}));
     renderChart();
-    const btn = screen.getByRole('button', { name: /download.*csv/i });
-    expect(btn).toBeDisabled();
+    expect(screen.getByRole('button', { name: /download.*csv/i })).toBeDisabled();
   });
 
-  it('shows error message on fetch failure', async () => {
+  it('shows error alert on fetch failure', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: false,
       status: 400,
@@ -86,7 +93,7 @@ describe('PriceChart', () => {
     });
   });
 
-  it('changes range on button click', async () => {
+  it('switching range updates aria-pressed on the new button', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => mockOHLCV,
@@ -94,11 +101,28 @@ describe('PriceChart', () => {
 
     renderChart();
 
-    const btn5Y = screen.getByRole('button', { name: /5Y/i });
+    const btn5Y = screen.getByRole('button', { name: /Show 5Y range/i });
     fireEvent.click(btn5Y);
 
     await waitFor(() => {
       expect(btn5Y).toHaveAttribute('aria-pressed', 'true');
+    });
+    // 1M should no longer be active
+    expect(screen.getByRole('button', { name: /Show 1M range/i }))
+      .toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('renders accessible data table after data loads', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => mockOHLCV,
+    } as Response);
+
+    renderChart();
+
+    await waitFor(() => {
+      const table = document.querySelector('table[aria-label]');
+      expect(table).toBeInTheDocument();
     });
   });
 });
