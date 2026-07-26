@@ -82,7 +82,7 @@ describe('MetricsGrid', () => {
 
   it('renders "What is this?" links for all metrics', () => {
     renderGrid(fullMetrics);
-    const links = screen.getAllByRole('link', { name: /what is this/i });
+    const links = screen.getAllByRole('link', { name: /what is .+learn more/i });
     expect(links).toHaveLength(7);
   });
 

@@ -19,7 +19,7 @@ const METRIC_DEFS: MetricDef[] = [
     key: 'pe',
     label: 'P/E Ratio',
     learnSlug: 'pe-ratio',
-    format: (v) => (v < 0 ? v.toFixed(2) : v.toFixed(2) + 'x'),
+    format: (v) => v.toFixed(2) + 'x',
     naReason: 'P/E is unavailable when earnings are zero or negative',
   },
   {

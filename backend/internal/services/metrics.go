@@ -196,7 +196,7 @@ func (s *MetricsService) fetchFromPolygon(ctx context.Context, ticker string) (*
 	if details.Results.PEO != nil {
 		metrics.PE = details.Results.PEO
 	}
-	if details.Results.BookValue != nil && details.Results.BookValue != nil {
+	if details.Results.BookValue != nil {
 		// PB = price / book value per share; would need current price
 		// For now store book value; PE ratio used directly from Polygon
 		metrics.PB = details.Results.BookValue
