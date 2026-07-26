@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   ComposedChart,
-  Line,
   Bar,
   Area,
   XAxis,
@@ -10,9 +9,6 @@ import {
   ResponsiveContainer,
   CartesianGrid,
   ReferenceLine,
-  defs,
-  LinearGradient,
-  Stop,
 } from 'recharts';
 import { useOHLCV, ChartRange, OHLCVBar } from '../../hooks/useOHLCV';
 import { downloadOHLCVAsCSV } from '../../utils/csvExport';
@@ -108,6 +104,10 @@ export const PriceChart: React.FC<PriceChartProps> = ({ ticker }) => {
 
   const accessibleRows = chartData.slice(-10);
 
+  // Unique gradient id per ticker to avoid SVG id collisions when multiple
+  // PriceChart instances exist on the same page.
+  const gradientId = `accentGrad-${ticker}`;
+
   return (
     <section className="price-chart" aria-labelledby="chart-heading">
       <div className="price-chart__toolbar">
@@ -179,9 +179,15 @@ export const PriceChart: React.FC<PriceChartProps> = ({ ticker }) => {
               data={chartData}
               margin={{ top: 8, right: 8, left: 0, bottom: 8 }}
             >
-              {/* Gradient fill for area under price line */}
+              {/*
+               * Native SVG <defs> embedded as a JSX child of ComposedChart.
+               * Recharts renders its children into the SVG root, so plain SVG
+               * elements work here without any recharts import.
+               * Do NOT import defs / linearGradient / stop from 'recharts' —
+               * they are not exported by the library.
+               */}
               <defs>
-                <linearGradient id={`accentGrad-${ticker}`} x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={THEME.accentColor} stopOpacity={0.18} />
                   <stop offset="100%" stopColor={THEME.accentColor} stopOpacity={0.01} />
                 </linearGradient>
@@ -219,7 +225,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({ ticker }) => {
                     dataKey="close"
                     stroke={THEME.accentColor}
                     strokeWidth={2}
-                    fill={`url(#accentGrad-${ticker})`}
+                    fill={`url(#${gradientId})`}
                     dot={false}
                     activeDot={{ r: 4, fill: THEME.accentColor, stroke: 'none' }}
                     name="Close"
@@ -255,7 +261,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({ ticker }) => {
                 </>
               )}
 
-              {/* Faint volume bars */}
+              {/* Faint volume bars in line mode */}
               {mode === 'line' && (
                 <Bar
                   dataKey="volume"
