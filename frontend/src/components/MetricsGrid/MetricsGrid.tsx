@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { MetricsResponse } from '../../hooks/useMetrics';
+import { ConceptSlideOver, useConceptLinkAvailability } from '../ConceptSlideOver/ConceptSlideOver';
 import './MetricsGrid.css';
 
 interface MetricsGridProps {
@@ -71,6 +72,73 @@ const METRIC_DEFS: MetricDef[] = [
 
 const SKELETON_COUNT = METRIC_DEFS.length;
 
+// ── Single metric card with contextual learn link ─────────────────────────────
+
+interface MetricCardProps {
+  metricDef: MetricDef;
+  displayValue: string;
+  valueClass: string;
+  naReason: string;
+  fiscalPeriod: string;
+}
+
+const MetricCard: React.FC<MetricCardProps> = ({
+  metricDef,
+  displayValue,
+  valueClass,
+  naReason,
+  fiscalPeriod,
+}) => {
+  const [slideOverOpen, setSlideOverOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const conceptAvailable = useConceptLinkAvailability(metricDef.learnSlug);
+
+  const handleOpen = () => setSlideOverOpen(true);
+  const handleClose = () => {
+    setSlideOverOpen(false);
+    // Restore focus to trigger element
+    triggerRef.current?.focus();
+  };
+
+  return (
+    <div className="metrics-grid__card">
+      <dt className="metrics-grid__label">
+        {metricDef.label}
+        {/* AC: Only render link if concept article exists (404 check) */}
+        {conceptAvailable && (
+          <button
+            ref={triggerRef}
+            className="metrics-grid__learn-link"
+            onClick={handleOpen}
+            aria-label={`What is ${metricDef.label}? — Open concept explainer`}
+            type="button"
+          >
+            What is this?
+          </button>
+        )}
+      </dt>
+      <dd
+        className={valueClass}
+        title={displayValue === '—' ? naReason : undefined}
+        aria-label={`${metricDef.label}: ${displayValue}${displayValue === '—' ? ` — ${naReason}` : ''}`}
+      >
+        {displayValue}
+      </dd>
+      <span className="metrics-grid__sublabel">
+        {fiscalPeriod}
+      </span>
+
+      {slideOverOpen && (
+        <ConceptSlideOver
+          slug={metricDef.learnSlug}
+          label={`What is ${metricDef.label}?`}
+          onClose={handleClose}
+        />
+      )}
+    </div>
+  );
+};
+
 /**
  * MetricsGrid — displays fundamental metric cards for the Financials tab.
  *
@@ -79,6 +147,8 @@ const SKELETON_COUNT = METRIC_DEFS.length;
  * AC: N/A values render as — em-dash in muted color, not "N/A" text.
  * AC: % change fields use positive/negative color; other numbers do not.
  * AC: Skeleton shimmer while loading — same card height as loaded state.
+ * AC: Each metric card has a 'What is [metric]?' link that opens ConceptSlideOver.
+ * AC: Link only shown if concept article exists (404 check via hook).
  */
 export const MetricsGrid: React.FC<MetricsGridProps> = ({ data, isLoading }) => {
   // Skeleton loading state
@@ -113,7 +183,8 @@ export const MetricsGrid: React.FC<MetricsGridProps> = ({ data, isLoading }) => 
       </header>
 
       <dl className="metrics-grid__list" aria-label="Financial metrics">
-        {METRIC_DEFS.map(({ key, label, learnSlug, format, naReason, isChangePct }) => {
+        {METRIC_DEFS.map((metricDef) => {
+          const { key, label, format, naReason, isChangePct } = metricDef;
           const rawValue = data.metrics[key];
           const isDividend = key === 'dividendYield';
           const isNA = rawValue === null || rawValue === undefined;
@@ -122,7 +193,7 @@ export const MetricsGrid: React.FC<MetricsGridProps> = ({ data, isLoading }) => 
 
           let displayValue: string;
           if (isNA) {
-            displayValue = '—'; // em-dash, not "N/A"
+            displayValue = '—';
           } else if (isZeroDividend) {
             displayValue = '—';
           } else {
@@ -131,7 +202,7 @@ export const MetricsGrid: React.FC<MetricsGridProps> = ({ data, isLoading }) => 
 
           let valueClass = 'metrics-grid__value font-mono';
           if (isNA || isZeroDividend) {
-            valueClass = 'metrics-grid__value--na metrics-grid__value'; // muted, no mono needed
+            valueClass = 'metrics-grid__value--na metrics-grid__value';
           } else if (isChangePct && rawValue !== null) {
             valueClass += (rawValue as number) >= 0
               ? ' text-positive'
@@ -141,28 +212,14 @@ export const MetricsGrid: React.FC<MetricsGridProps> = ({ data, isLoading }) => 
           }
 
           return (
-            <div key={key} className="metrics-grid__card">
-              <dt className="metrics-grid__label">
-                {label}
-                <a
-                  href={`/learn/${learnSlug}`}
-                  className="metrics-grid__learn-link"
-                  aria-label={`What is ${label}? — Learn more`}
-                >
-                  What is this?
-                </a>
-              </dt>
-              <dd
-                className={valueClass}
-                title={isNA ? naReason : undefined}
-                aria-label={`${label}: ${displayValue}${isNA ? ` — ${naReason}` : ''}`}
-              >
-                {displayValue}
-              </dd>
-              <span className="metrics-grid__sublabel">
-                {data.fiscalPeriod}
-              </span>
-            </div>
+            <MetricCard
+              key={key}
+              metricDef={metricDef}
+              displayValue={displayValue}
+              valueClass={valueClass}
+              naReason={naReason}
+              fiscalPeriod={data.fiscalPeriod}
+            />
           );
         })}
       </dl>
