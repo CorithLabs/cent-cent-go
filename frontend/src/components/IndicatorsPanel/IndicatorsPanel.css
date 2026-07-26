@@ -1,0 +1,209 @@
+/* ── IndicatorsPanel ────────────────────────────────────────────────────────── */
+.indicators-panel {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  box-shadow: var(--shadow-sm);
+  margin-top: 16px;
+}
+
+/* Toggle button */
+.indicators-panel__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.indicators-panel__toggle:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.indicators-panel__toggle--open {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.indicators-panel__toggle-icon {
+  font-size: 0.6875rem;
+  opacity: 0.7;
+}
+
+.indicators-panel__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--color-primary);
+  color: white;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0 5px;
+}
+
+/* Selection list */
+.indicators-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--color-background);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.indicators-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.1s ease;
+  font-size: 0.8125rem;
+}
+
+.indicators-panel__row:hover {
+  background: var(--color-surface);
+}
+
+.indicators-panel__row--active {
+  background: var(--color-surface);
+}
+
+.indicators-panel__checkbox {
+  /* Visually hidden but accessible */
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.indicators-panel__color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.indicators-panel__label {
+  font-weight: 500;
+  color: var(--color-text);
+  flex-shrink: 0;
+  min-width: 100px;
+}
+
+.indicators-panel__desc {
+  color: var(--color-muted);
+  font-size: 0.75rem;
+}
+
+/* Legend */
+.indicators-panel__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.indicators-panel__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  font-family: var(--font-mono, monospace);
+  color: var(--color-text-secondary);
+}
+
+.indicators-panel__legend-swatch {
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* Overlay chart */
+.indicators-panel__sub-chart {
+  margin-top: 16px;
+  width: 100%;
+  height: 180px;
+  background: var(--color-background);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.indicators-panel__sub-chart--loading {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Sub-panel (RSI/MACD) */
+.indicators-panel__sub-panel {
+  margin-top: 16px;
+  background: var(--color-background);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  padding: 12px 12px 8px;
+}
+
+.indicators-panel__sub-panel-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+}
+
+/* Unavailable notice */
+.indicators-panel__unavailable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 60px;
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+/* Tooltip */
+.indicators-panel__tooltip {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  box-shadow: var(--shadow-md);
+  font-size: 0.8125rem;
+}
+
+.indicators-panel__tooltip-date {
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.indicators-panel__tooltip-row {
+  display: flex;
+  gap: 6px;
+  font-size: 0.8125rem;
+}
