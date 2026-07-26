@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/CorithLabs/cent-cent-go/internal/services"
@@ -11,17 +12,25 @@ import (
 
 // StockHandler handles /api/stocks/* endpoints
 type StockHandler struct {
-	quoteSvc *services.StockQuoteService
-	ohlcvSvc *services.OHLCVService
-	db       *pgxpool.Pool
+	quoteSvc      *services.StockQuoteService
+	ohlcvSvc      *services.OHLCVService
+	indicatorSvc  *services.IndicatorService
+	metricsSvc    *services.MetricsService
+	financialsSvc *services.FinancialsService
+	eli5Svc       *services.ELI5Service
+	db            *pgxpool.Pool
 }
 
 // NewStockHandler creates a new StockHandler.
 func NewStockHandler(db *pgxpool.Pool) *StockHandler {
 	return &StockHandler{
-		quoteSvc: services.NewStockQuoteService(db),
-		ohlcvSvc: services.NewOHLCVService(db),
-		db:       db,
+		quoteSvc:      services.NewStockQuoteService(db),
+		ohlcvSvc:      services.NewOHLCVService(db),
+		indicatorSvc:  services.NewIndicatorService(db),
+		metricsSvc:    services.NewMetricsService(db),
+		financialsSvc: services.NewFinancialsService(db),
+		eli5Svc:       services.NewELI5Service(db),
+		db:            db,
 	}
 }
 
@@ -83,24 +92,118 @@ func (h *StockHandler) GetHistory(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-// GetIndicators handles GET /api/stocks/:ticker/indicators
+// GetIndicators handles GET /api/stocks/:ticker/indicators?indicator=&period=&range=
+// AC: Computes SMA, EMA, Bollinger, RSI, MACD server-side from stored OHLCV data.
+// AC: Returns 400 for unsupported indicator names.
+// AC: Insufficient data returns partial results with a warning field.
 func (h *StockHandler) GetIndicators(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "not yet implemented"})
+	ticker := strings.ToUpper(c.Param("ticker"))
+	indicator := strings.ToLower(c.Query("indicator"))
+	rangeStr := c.DefaultQuery("range", "1y")
+
+	if !services.IsValidIndicator(indicator) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "unsupported indicator — valid values: sma, ema, bollinger, rsi, macd",
+		})
+		return
+	}
+
+	period := 20 // sensible default
+	if p := c.Query("period"); p != "" {
+		if n, err := strconv.Atoi(p); err == nil && n > 0 && n <= 500 {
+			period = n
+		}
+	}
+
+	result, err := h.indicatorSvc.Compute(c.Request.Context(), ticker, indicator, rangeStr, period)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // GetMetrics handles GET /api/stocks/:ticker/metrics
+// AC: Returns ticker, fiscalPeriod, lastUpdated, and metrics object.
+// AC: Returns 404 for unknown tickers.
+// AC: Fiscal period and lastUpdated shown on every metric card.
 func (h *StockHandler) GetMetrics(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "not yet implemented"})
+	ticker := strings.ToUpper(c.Param("ticker"))
+
+	result, err := h.metricsSvc.GetMetrics(c.Request.Context(), ticker)
+	if err != nil {
+		if services.IsNotFound(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "ticker not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch metrics"})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
-// GetFinancials handles GET /api/stocks/:ticker/financials
+// GetFinancials handles GET /api/stocks/:ticker/financials?statement=&period=&limit=
+// AC: Returns 400 for invalid statement type.
+// AC: Gaps in data (new public company mid-year) shown as missing entries (nil), not zeros.
 func (h *StockHandler) GetFinancials(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "not yet implemented"})
+	ticker := strings.ToUpper(c.Param("ticker"))
+	statement := c.DefaultQuery("statement", "income")
+	period := c.DefaultQuery("period", "annual")
+
+	if !services.IsValidStatement(statement) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid statement type — valid values: income, balance, cashflow",
+		})
+		return
+	}
+
+	if period != "annual" && period != "quarterly" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid period — valid values: annual, quarterly",
+		})
+		return
+	}
+
+	limit := 4
+	if l := c.Query("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 && n <= 20 {
+			limit = n
+		}
+	}
+
+	result, err := h.financialsSvc.GetFinancials(c.Request.Context(), ticker, statement, period, limit)
+	if err != nil {
+		if services.IsNotFound(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "ticker not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch financial statements"})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // GetELI5 handles GET /api/stocks/:ticker/eli5
+// AC: Returns structured analysis object — no LLM call server-side.
+// AC: Response cached per ticker for 1 hour.
+// AC: Returns 404 for unknown tickers.
 func (h *StockHandler) GetELI5(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "not yet implemented"})
+	ticker := strings.ToUpper(c.Param("ticker"))
+
+	result, err := h.eli5Svc.GetELI5(c.Request.Context(), ticker)
+	if err != nil {
+		if services.IsNotFound(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "ticker not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate ELI5 analysis"})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // GetBatchQuotes handles GET /api/stocks/quotes?tickers=

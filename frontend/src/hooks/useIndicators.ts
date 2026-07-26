@@ -1,118 +1,143 @@
-import { useState, useEffect } from 'react';
-import { ChartRange } from './useOHLCV';
+import { useState, useEffect, useCallback } from 'react';
 
-export type IndicatorKey =
-  | 'sma_50'
-  | 'sma_200'
-  | 'ema_20'
-  | 'bollinger'
-  | 'rsi'
-  | 'macd';
+export type IndicatorKey = 'sma50' | 'sma200' | 'ema20' | 'bollinger' | 'rsi' | 'macd';
 
-// Map from our UI key to what the backend `indicator` param expects
-const INDICATOR_PARAM: Record<IndicatorKey, string> = {
-  sma_50:    'sma',
-  sma_200:   'sma',
-  ema_20:    'ema',
-  bollinger: 'bollinger',
-  rsi:       'rsi',
-  macd:      'macd',
-};
-
-// Period to use for each indicator type
-const INDICATOR_PERIOD: Partial<Record<IndicatorKey, number>> = {
-  sma_50:  50,
-  sma_200: 200,
-  ema_20:  20,
-};
-
-// Ranges for which an indicator is not meaningful
-const UNSUPPORTED_RANGE: Partial<Record<IndicatorKey, ChartRange[]>> = {
-  sma_200: ['1d', '5d', '1m'],
-  sma_50:  ['1d', '5d'],
-  macd:    ['1d'],
-  rsi:     ['1d'],
-};
-
-export interface IndicatorPoint {
+export interface IndicatorDataPoint {
   timestamp: string;
-  value: number;
-  // MACD extras
-  signal?: number;
-  histogram?: number;
-  // Bollinger extras
-  upper?: number;
-  lower?: number;
+  value?: number;
+  upper?: number; // Bollinger upper band
+  lower?: number; // Bollinger lower band
+  signal?: number; // MACD signal line
+  histogram?: number; // MACD histogram
 }
 
-interface UseIndicatorsReturn {
-  data: IndicatorPoint[] | null;
-  isLoading: boolean;
-  error: string | null;
-  unavailable: boolean;
+export interface IndicatorResult {
+  indicator: IndicatorKey;
+  period?: number;
+  data: IndicatorDataPoint[];
+  warning?: string; // e.g. "Insufficient data for full SMA 200"
+}
+
+export interface IndicatorConfig {
+  key: IndicatorKey;
+  label: string;
+  color: string;
+  /** True if this indicator renders as a dashed line */
+  dashed?: boolean;
+  subPanel: boolean; // RSI and MACD render in a sub-panel, not overlaid
+  apiIndicator: string; // maps to backend enum
+  period?: number;
 }
 
 /**
- * Fetches technical indicator data for a given ticker, indicator key, and range.
- * Returns `unavailable: true` for combinations that are unsupported (e.g. RSI on 1D).
+ * Indicator color palette — matched to design spec:
+ * SMA50   → #F59E0B  (amber)
+ * SMA200  → #8B5CF6  (purple)
+ * EMA20   → #06B6D4  (cyan)
+ * Bollinger → #64748B (slate, dashed)
+ * RSI     → uses --color-accent for line, overbought/oversold in panel
+ * MACD    → histogram uses --color-positive / --color-negative
+ */
+export const INDICATOR_CONFIGS: IndicatorConfig[] = [
+  { key: 'sma50',     label: 'SMA 50',         color: '#F59E0B', dashed: false, subPanel: false, apiIndicator: 'sma',       period: 50  },
+  { key: 'sma200',    label: 'SMA 200',         color: '#8B5CF6', dashed: false, subPanel: false, apiIndicator: 'sma',       period: 200 },
+  { key: 'ema20',     label: 'EMA 20',          color: '#06B6D4', dashed: false, subPanel: false, apiIndicator: 'ema',       period: 20  },
+  { key: 'bollinger', label: 'Bollinger Bands', color: '#64748B', dashed: true,  subPanel: false, apiIndicator: 'bollinger', period: 20  },
+  { key: 'rsi',       label: 'RSI (14)',         color: '#3B82F6', dashed: false, subPanel: true,  apiIndicator: 'rsi',       period: 14  },
+  { key: 'macd',      label: 'MACD',             color: '#3B82F6', dashed: false, subPanel: true,  apiIndicator: 'macd'                   },
+];
+
+interface UseIndicatorsReturn {
+  activeKeys: Set<IndicatorKey>;
+  toggleIndicator: (key: IndicatorKey) => void;
+  data: Map<IndicatorKey, IndicatorResult>;
+  loadingKeys: Set<IndicatorKey>;
+  unavailableKeys: Set<IndicatorKey>; // e.g. RSI on 1D intraday
+}
+
+/**
+ * Manages indicator toggle state and fetches indicator data on demand.
+ * Indicators are fetched individually as they are toggled on.
  */
 export function useIndicators(
   ticker: string,
-  key: IndicatorKey,
-  range: ChartRange
+  range: string
 ): UseIndicatorsReturn {
-  const [data, setData] = useState<IndicatorPoint[] | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [activeKeys, setActiveKeys] = useState<Set<IndicatorKey>>(new Set());
+  const [data, setData] = useState<Map<IndicatorKey, IndicatorResult>>(new Map());
+  const [loadingKeys, setLoadingKeys] = useState<Set<IndicatorKey>>(new Set());
 
-  const unsupportedRanges = UNSUPPORTED_RANGE[key] ?? [];
-  const unavailable = unsupportedRanges.includes(range);
+  // RSI and MACD require daily data — not available on 1D intraday
+  const unavailableKeys = new Set<IndicatorKey>(
+    range === '1d' ? ['rsi', 'macd'] as IndicatorKey[] : []
+  );
 
-  useEffect(() => {
-    if (!ticker || unavailable) {
-      setData(null);
-      setIsLoading(false);
-      setError(null);
-      return;
-    }
+  const fetchIndicator = useCallback(
+    async (key: IndicatorKey) => {
+      const config = INDICATOR_CONFIGS.find((c) => c.key === key);
+      if (!config) return;
 
-    let cancelled = false;
-    setIsLoading(true);
-    setError(null);
+      setLoadingKeys((prev) => new Set(prev).add(key));
 
-    const fetchData = async () => {
       try {
-        const params = new URLSearchParams({
-          indicator: INDICATOR_PARAM[key],
-          range,
-        });
-        const period = INDICATOR_PERIOD[key];
-        if (period != null) params.set('period', String(period));
+        const params = new URLSearchParams({ indicator: config.apiIndicator, range });
+        if (config.period) params.set('period', String(config.period));
 
-        const res = await fetch(
-          `/api/stocks/${encodeURIComponent(ticker)}/indicators?${params.toString()}`
-        );
+        const res = await fetch(`/api/stocks/${encodeURIComponent(ticker)}/indicators?${params}`);
 
         if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.error || `Server returned ${res.status}`);
+          console.warn(`Indicator ${key} fetch failed:`, res.status);
+          return;
         }
 
-        const json = await res.json();
-        // Backend returns { indicator, period, data: [...] }
-        if (!cancelled) setData(json.data ?? []);
+        const result: IndicatorResult = await res.json();
+
+        setData((prev) => {
+          const next = new Map(prev);
+          next.set(key, { ...result, indicator: key });
+          return next;
+        });
       } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load indicator data');
-        }
+        console.warn(`Indicator ${key} error:`, err);
       } finally {
-        if (!cancelled) setIsLoading(false);
+        setLoadingKeys((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
       }
-    };
+    },
+    [ticker, range]
+  );
 
-    fetchData();
-    return () => { cancelled = true; };
-  }, [ticker, key, range, unavailable]);
+  const toggleIndicator = useCallback(
+    (key: IndicatorKey) => {
+      setActiveKeys((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) {
+          next.delete(key);
+        } else {
+          next.add(key);
+          if (!data.has(key)) {
+            fetchIndicator(key);
+          }
+        }
+        return next;
+      });
+    },
+    [data, fetchIndicator]
+  );
 
-  return { data, isLoading, error, unavailable };
+  // Re-fetch active indicators when range changes
+  useEffect(() => {
+    if (activeKeys.size === 0) return;
+    activeKeys.forEach((key) => {
+      if (!unavailableKeys.has(key)) {
+        fetchIndicator(key);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [range]);
+
+  return { activeKeys, toggleIndicator, data, loadingKeys, unavailableKeys };
 }

@@ -76,3 +76,19 @@ export function isStale(isoString: string, maxAgeMinutes = 15): boolean {
   const diffMin = (Date.now() - date.getTime()) / 60_000;
   return diffMin > maxAgeMinutes;
 }
+
+/**
+ * Format a financial statement line-item value with smart units.
+ * Handles very small companies (values in thousands) correctly.
+ * Never shows "$0B" for small values.
+ */
+export function formatFinancialValue(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  if (isNaN(value)) return '—';
+  const abs = Math.abs(value);
+  const sign = value < 0 ? '-' : '';
+  if (abs >= 1_000_000_000) return `${sign}$${(abs / 1_000_000_000).toFixed(2)}B`;
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(0)}K`;
+  return `${sign}$${abs.toFixed(0)}`;
+}

@@ -74,11 +74,14 @@ export const StockOverviewHeader: React.FC<StockOverviewHeaderProps> = ({ quote 
 
       {/* ── Price block ────────────────────────────────────────────────── */}
       <div className="stock-header__price-block">
-        <span className="stock-header__price" aria-label={`Current price: ${formatPrice(quote.price)}`}>
+        <span
+          className="stock-header__price font-mono"
+          aria-label={`Current price: ${formatPrice(quote.price)}`}
+        >
           {formatPrice(quote.price)}
         </span>
         <span
-          className={`stock-header__change ${changeClass}`}
+          className={`stock-header__change font-mono ${changeClass}`}
           aria-label={`Change: ${formatChange(quote.change)} (${formatPct(quote.changePct)})`}
         >
           {formatChange(quote.change)} ({formatPct(quote.changePct)})
@@ -89,19 +92,19 @@ export const StockOverviewHeader: React.FC<StockOverviewHeaderProps> = ({ quote 
       <dl className="stock-header__stats" aria-label="Key statistics">
         <div className="stock-header__stat">
           <dt>Market Cap</dt>
-          <dd>{formatCurrency(quote.marketCap)}</dd>
+          <dd className="font-mono">{formatCurrency(quote.marketCap)}</dd>
         </div>
         <div className="stock-header__stat">
           <dt>Volume</dt>
-          <dd>{formatVolume(quote.volume)}</dd>
+          <dd className="font-mono">{formatVolume(quote.volume)}</dd>
         </div>
         <div className="stock-header__stat">
           <dt>52-Week High</dt>
-          <dd>{formatPrice(quote.week52High)}</dd>
+          <dd className="font-mono">{formatPrice(quote.week52High)}</dd>
         </div>
         <div className="stock-header__stat">
           <dt>52-Week Low</dt>
-          <dd>{formatPrice(quote.week52Low)}</dd>
+          <dd className="font-mono">{formatPrice(quote.week52Low)}</dd>
         </div>
       </dl>
 

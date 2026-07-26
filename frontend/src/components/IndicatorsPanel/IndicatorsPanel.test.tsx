@@ -1,122 +1,194 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { IndicatorsPanel } from './IndicatorsPanel';
+import { IndicatorKey, IndicatorResult } from '../../hooks/useIndicators';
 
-const mockIndicatorData = {
-  indicator: 'sma',
-  period: 50,
-  data: Array.from({ length: 20 }, (_, i) => ({
-    timestamp: new Date(Date.now() - (19 - i) * 86400000).toISOString(),
-    value: 180 + i * 0.5,
-  })),
-};
-
-const renderPanel = (range = '1m' as const) =>
-  render(
-    <MemoryRouter>
-      <IndicatorsPanel ticker="AAPL" range={range} />
-    </MemoryRouter>
-  );
-
-beforeEach(() => {
-  vi.restoreAllMocks();
+// Mock Recharts components for non-browser environment
+vi.mock('recharts', async () => {
+  const actual = await vi.importActual<typeof import('recharts')>('recharts');
+  const Noop: React.FC<{ children?: React.ReactNode }> = ({ children }) => <>{children}</>;
+  return {
+    ...actual,
+    ResponsiveContainer: Noop,
+    LineChart: Noop,
+    ComposedChart: Noop,
+    Line: () => null,
+    Bar: () => null,
+    Area: () => null,
+    XAxis: () => null,
+    YAxis: () => null,
+    CartesianGrid: () => null,
+    ReferenceLine: () => null,
+    Tooltip: () => null,
+    Cell: () => null,
+  };
 });
 
-describe('IndicatorsPanel', () => {
+const noop = () => {};
+
+const makeMockData = (key: IndicatorKey): IndicatorResult => ({
+  indicator: key,
+  data: Array.from({ length: 10 }, (_, i) => ({
+    timestamp: new Date(Date.now() - i * 86400000).toISOString(),
+    value: 50 + i,
+    histogram: i % 2 === 0 ? 0.5 : -0.3,
+    signal: 49 + i,
+  })),
+});
+
+describe('IndicatorsPanel — themed', () => {
   it('renders the Indicators toggle button', () => {
-    renderPanel();
+    render(
+      <IndicatorsPanel
+        activeKeys={new Set()}
+        loadingKeys={new Set()}
+        unavailableKeys={new Set()}
+        onToggle={noop}
+      />
+    );
     expect(screen.getByRole('button', { name: /indicators/i })).toBeInTheDocument();
   });
 
-  it('panel is collapsed by default', () => {
-    renderPanel();
-    expect(screen.queryByLabelText(/toggle sma 50/i)).not.toBeInTheDocument();
+  it('opens the dropdown and shows all 6 indicators', () => {
+    render(
+      <IndicatorsPanel
+        activeKeys={new Set()}
+        loadingKeys={new Set()}
+        unavailableKeys={new Set()}
+        onToggle={noop}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /indicators/i }));
+    expect(screen.getByText('SMA 50')).toBeInTheDocument();
+    expect(screen.getByText('SMA 200')).toBeInTheDocument();
+    expect(screen.getByText('EMA 20')).toBeInTheDocument();
+    expect(screen.getByText('Bollinger Bands')).toBeInTheDocument();
+    expect(screen.getByText('RSI (14)')).toBeInTheDocument();
+    expect(screen.getByText('MACD')).toBeInTheDocument();
   });
 
-  it('expands to show 6 indicator options when toggled', () => {
-    renderPanel();
+  it('calls onToggle when an indicator is clicked', () => {
+    const onToggle = vi.fn();
+    render(
+      <IndicatorsPanel
+        activeKeys={new Set()}
+        loadingKeys={new Set()}
+        unavailableKeys={new Set()}
+        onToggle={onToggle}
+      />
+    );
     fireEvent.click(screen.getByRole('button', { name: /indicators/i }));
-    expect(screen.getByLabelText(/toggle sma 50/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/toggle sma 200/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/toggle ema 20/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/toggle bollinger bands/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/toggle rsi/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/toggle macd/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /SMA 50/i }));
+    expect(onToggle).toHaveBeenCalledWith('sma50');
   });
 
-  it('activating an indicator shows its badge count', () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      json: async () => mockIndicatorData,
-    } as Response);
-
-    renderPanel();
-    fireEvent.click(screen.getByRole('button', { name: /indicators/i }));
-    fireEvent.click(screen.getByLabelText(/toggle sma 50/i));
-
-    // Badge showing count 1 should appear on the toggle button
-    expect(screen.getByLabelText('1 active')).toBeInTheDocument();
-  });
-
-  it('deactivating an indicator removes the legend item', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      json: async () => mockIndicatorData,
-    } as Response);
-
-    renderPanel();
-    fireEvent.click(screen.getByRole('button', { name: /indicators/i }));
-
-    // Activate
-    fireEvent.click(screen.getByLabelText(/toggle sma 50/i));
-    await waitFor(() => {
-      expect(screen.getByLabelText('1 active')).toBeInTheDocument();
-    });
-
-    // Deactivate
-    fireEvent.click(screen.getByLabelText(/toggle sma 50/i));
-    await waitFor(() => {
-      expect(screen.queryByLabelText('1 active')).not.toBeInTheDocument();
-    });
-  });
-
-  it('multiple indicators can be active simultaneously', () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      json: async () => mockIndicatorData,
-    } as Response);
-
-    renderPanel();
-    fireEvent.click(screen.getByRole('button', { name: /indicators/i }));
-    fireEvent.click(screen.getByLabelText(/toggle sma 50/i));
-    fireEvent.click(screen.getByLabelText(/toggle ema 20/i));
-
+  it('shows active indicator count badge', () => {
+    const active = new Set<IndicatorKey>(['sma50', 'rsi']);
+    render(
+      <IndicatorsPanel
+        activeKeys={active}
+        loadingKeys={new Set()}
+        unavailableKeys={new Set()}
+        onToggle={noop}
+      />
+    );
     expect(screen.getByLabelText('2 active')).toBeInTheDocument();
   });
 
-  it('renders the legend for each active indicator', () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      json: async () => mockIndicatorData,
-    } as Response);
-
-    renderPanel();
+  it('disables unavailable indicators (RSI/MACD on 1D)', () => {
+    render(
+      <IndicatorsPanel
+        activeKeys={new Set()}
+        loadingKeys={new Set()}
+        unavailableKeys={new Set(['rsi', 'macd'] as IndicatorKey[])}
+        onToggle={noop}
+      />
+    );
     fireEvent.click(screen.getByRole('button', { name: /indicators/i }));
-    fireEvent.click(screen.getByLabelText(/toggle sma 50/i));
-
-    const legend = screen.getByRole('list', { name: /active indicators/i });
-    expect(legend).toBeInTheDocument();
-    expect(legend.textContent).toMatch(/SMA 50/i);
+    expect(screen.getByRole('button', { name: /RSI/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /MACD/i })).toBeDisabled();
   });
 
-  it('shows unavailable notice for RSI on 1D range', () => {
-    renderPanel('1d');
-    fireEvent.click(screen.getByRole('button', { name: /indicators/i }));
-    fireEvent.click(screen.getByLabelText(/toggle rsi/i));
+  it('shows legend for active indicators with --font-mono class', () => {
+    const active = new Set<IndicatorKey>(['sma50']);
+    render(
+      <IndicatorsPanel
+        activeKeys={active}
+        loadingKeys={new Set()}
+        unavailableKeys={new Set()}
+        onToggle={noop}
+      />
+    );
+    const legend = screen.getByLabelText('Active indicators legend');
+    expect(legend).toBeInTheDocument();
+    // Legend items use --font-mono via .indicators-panel__legend-item class
+    const legendItem = legend.querySelector('.indicators-panel__legend-item');
+    expect(legendItem).toBeInTheDocument();
+  });
 
-    // RSI is unavailable for 1d range — the sub-panel shows the notice
-    expect(screen.getByRole('status')).toBeInTheDocument();
-    expect(screen.getByRole('status').textContent).toMatch(/not available/i);
+  it('renders RSI sub-panel when RSI is active and data provided', () => {
+    const data = new Map<IndicatorKey, IndicatorResult>();
+    data.set('rsi', makeMockData('rsi'));
+
+    render(
+      <IndicatorsPanel
+        activeKeys={new Set<IndicatorKey>(['rsi'])}
+        loadingKeys={new Set()}
+        unavailableKeys={new Set()}
+        onToggle={noop}
+        data={data}
+      />
+    );
+    expect(screen.getByRole('img', { name: /RSI.*sub-chart/i })).toBeInTheDocument();
+  });
+
+  it('renders MACD sub-panel when MACD is active and data provided', () => {
+    const data = new Map<IndicatorKey, IndicatorResult>();
+    data.set('macd', makeMockData('macd'));
+
+    render(
+      <IndicatorsPanel
+        activeKeys={new Set<IndicatorKey>(['macd'])}
+        loadingKeys={new Set()}
+        unavailableKeys={new Set()}
+        onToggle={noop}
+        data={data}
+      />
+    );
+    expect(screen.getByRole('img', { name: /MACD.*sub-chart/i })).toBeInTheDocument();
+  });
+
+  it('renders both sub-panels when RSI + MACD are both active', () => {
+    const data = new Map<IndicatorKey, IndicatorResult>();
+    data.set('rsi', makeMockData('rsi'));
+    data.set('macd', makeMockData('macd'));
+
+    render(
+      <IndicatorsPanel
+        activeKeys={new Set<IndicatorKey>(['rsi', 'macd'])}
+        loadingKeys={new Set()}
+        unavailableKeys={new Set()}
+        onToggle={noop}
+        data={data}
+      />
+    );
+    expect(screen.getByRole('img', { name: /RSI/i })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /MACD/i })).toBeInTheDocument();
+  });
+
+  it('closes dropdown when toggle is clicked again', () => {
+    render(
+      <IndicatorsPanel
+        activeKeys={new Set()}
+        loadingKeys={new Set()}
+        unavailableKeys={new Set()}
+        onToggle={noop}
+      />
+    );
+    const btn = screen.getByRole('button', { name: /indicators/i });
+    fireEvent.click(btn);
+    expect(screen.getByText('SMA 50')).toBeInTheDocument();
+    fireEvent.click(btn);
+    expect(screen.queryByText('SMA 50')).not.toBeInTheDocument();
   });
 });

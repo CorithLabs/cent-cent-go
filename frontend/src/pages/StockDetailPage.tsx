@@ -1,21 +1,61 @@
-import React from 'react';
-import { useParams, Link, NavLink } from 'react-router-dom';
+import React, { useState, lazy, Suspense, useCallback } from 'react';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useStockQuote } from '../hooks/useStockQuote';
 import { StockOverviewHeader } from '../components/StockOverviewHeader/StockOverviewHeader';
+import { formatPrice, formatPct } from '../utils/formatters';
 import './StockDetailPage.css';
 
+// Lazy-load tab panels to avoid loading all data upfront
+const PriceChart = lazy(() => import('../components/PriceChart/PriceChart'));
+const ELI5Panel  = lazy(() => import('../components/ELI5Panel/ELI5Panel'));
+const FinancialsPanel = lazy(() => import('./StockDetailFinancialsPanel'));
+
+type TabKey = 'overview' | 'chart' | 'financials' | 'eli5';
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'overview',   label: 'Overview'   },
+  { key: 'chart',      label: 'Chart'      },
+  { key: 'financials', label: 'Financials' },
+  { key: 'eli5',       label: 'ELI5'       },
+];
+
 /**
- * StockDetailPage — renders at /stock/:ticker
- * AC: Shows price, change, market cap, volume, 52-week range, exchange.
- * AC: Shows data freshness timestamp and disclaimer.
- * AC: Unknown tickers show a 404 page.
- * AC: Ticker in URL is uppercased automatically.
+ * StockDetailPage — /stock/:ticker
+ *
+ * AC: Sticky compact header (≤72px) — ticker, price, % change always visible.
+ * AC: Sticky tab bar directly below header.
+ * AC: Tab state in ?tab= URL param — shareable and refresh-safe.
+ * AC: Overview: StockOverviewHeader (full metrics) + collapsible ELI5Panel.
+ * AC: Lazy-rendered panels — data already fetched is not re-fetched on tab switch.
+ * AC: Page bg --color-bg-primary; cards --color-bg-surface + --shadow-card.
  */
 const StockDetailPage: React.FC = () => {
   const { ticker = '' } = useParams<{ ticker: string }>();
   const normalizedTicker = ticker.toUpperCase();
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = (searchParams.get('tab') ?? 'overview') as TabKey;
+
+  // Track which panels have been activated — only mount them once (no re-fetch on tab switch)
+  const [mountedTabs, setMountedTabs] = useState<Set<TabKey>>(new Set(['overview']));
+
+  const [eli5Expanded, setEli5Expanded] = useState(false);
+
   const { quote, isLoading, error, notFound } = useStockQuote(normalizedTicker);
+
+  const handleTabChange = useCallback(
+    (tab: TabKey) => {
+      setSearchParams({ tab }, { replace: true });
+      setMountedTabs((prev) => {
+        const next = new Set(prev);
+        next.add(tab);
+        return next;
+      });
+    },
+    [setSearchParams]
+  );
+
+  // ── Error states ──────────────────────────────────────────────────────────
 
   if (notFound) {
     return (
@@ -51,38 +91,134 @@ const StockDetailPage: React.FC = () => {
 
   if (!quote) return null;
 
+  const isPositive = quote.change >= 0;
+
   return (
     <div className="stock-detail">
-      <StockOverviewHeader quote={quote} />
+      {/* ── Sticky compact header ─────────────────────────────────────── */}
+      <header className="stock-detail__sticky-header" aria-label="Stock summary">
+        <div className="stock-detail__sticky-inner">
+          <span className="stock-detail__sticky-ticker">{quote.ticker}</span>
+          <span
+            className={`stock-detail__sticky-price font-mono ${
+              isPositive ? 'text-positive' : 'text-negative'
+            }`}
+            aria-label={`Price: ${formatPrice(quote.price)}, Change: ${formatPct(quote.changePct)}`}
+          >
+            {formatPrice(quote.price)}
+            <span className="stock-detail__sticky-change">
+              {' '}
+              {isPositive ? '+' : ''}{formatPct(quote.changePct)}
+            </span>
+          </span>
+          <span className="stock-detail__sticky-name">{quote.name}</span>
+        </div>
 
-      {/* ── Tab navigation ─────────────────────────────────────────────── */}
-      <nav className="stock-detail__tabs" aria-label="Stock sections">
-        <NavLink
-          to={`/stock/${normalizedTicker}`}
-          end
-          className={({ isActive }) =>
-            `stock-detail__tab${isActive ? ' stock-detail__tab--active' : ''}`
-          }
+        {/* ── Tab bar ───────────────────────────────────────────────── */}
+        <nav
+          className="stock-detail__tabs"
+          role="tablist"
+          aria-label="Stock detail sections"
         >
-          Overview
-        </NavLink>
-        <NavLink
-          to={`/stock/${normalizedTicker}/chart`}
-          className={({ isActive }) =>
-            `stock-detail__tab${isActive ? ' stock-detail__tab--active' : ''}`
-          }
+          {TABS.map(({ key, label }) => (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={activeTab === key}
+              aria-controls={`tab-panel-${key}`}
+              id={`tab-${key}`}
+              className={`stock-detail__tab${activeTab === key ? ' stock-detail__tab--active' : ''}`}
+              onClick={() => handleTabChange(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      </header>
+
+      {/* ── Tab panels ────────────────────────────────────────────────── */}
+      <div className="stock-detail__content">
+
+        {/* Overview panel */}
+        <div
+          id="tab-panel-overview"
+          role="tabpanel"
+          aria-labelledby="tab-overview"
+          hidden={activeTab !== 'overview'}
+          className="stock-detail__panel"
         >
-          Chart
-        </NavLink>
-        <NavLink
-          to={`/stock/${normalizedTicker}/financials`}
-          className={({ isActive }) =>
-            `stock-detail__tab${isActive ? ' stock-detail__tab--active' : ''}`
-          }
+          {(mountedTabs.has('overview') || activeTab === 'overview') && (
+            <>
+              <StockOverviewHeader quote={quote} />
+
+              {/* ELI5 Panel — collapsed by default, expandable */}
+              <div className="stock-detail__eli5-section">
+                <button
+                  className="stock-detail__eli5-toggle"
+                  onClick={() => setEli5Expanded((v) => !v)}
+                  aria-expanded={eli5Expanded}
+                  aria-controls="eli5-content"
+                >
+                  <span>How is this stock doing? (ELI5)</span>
+                  <span aria-hidden="true">{eli5Expanded ? '▲' : '▼'}</span>
+                </button>
+                {eli5Expanded && (
+                  <div id="eli5-content">
+                    <Suspense fallback={<div className="page-loading">Loading…</div>}>
+                      <ELI5Panel ticker={normalizedTicker} />
+                    </Suspense>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Chart panel */}
+        <div
+          id="tab-panel-chart"
+          role="tabpanel"
+          aria-labelledby="tab-chart"
+          hidden={activeTab !== 'chart'}
+          className="stock-detail__panel"
         >
-          Financials
-        </NavLink>
-      </nav>
+          {mountedTabs.has('chart') && (
+            <Suspense fallback={<div className="page-loading">Loading chart…</div>}>
+              <PriceChart ticker={normalizedTicker} />
+            </Suspense>
+          )}
+        </div>
+
+        {/* Financials panel */}
+        <div
+          id="tab-panel-financials"
+          role="tabpanel"
+          aria-labelledby="tab-financials"
+          hidden={activeTab !== 'financials'}
+          className="stock-detail__panel"
+        >
+          {mountedTabs.has('financials') && (
+            <Suspense fallback={<div className="page-loading">Loading financials…</div>}>
+              <FinancialsPanel ticker={normalizedTicker} />
+            </Suspense>
+          )}
+        </div>
+
+        {/* ELI5 panel (full page tab) */}
+        <div
+          id="tab-panel-eli5"
+          role="tabpanel"
+          aria-labelledby="tab-eli5"
+          hidden={activeTab !== 'eli5'}
+          className="stock-detail__panel"
+        >
+          {mountedTabs.has('eli5') && (
+            <Suspense fallback={<div className="page-loading">Loading ELI5…</div>}>
+              <ELI5Panel ticker={normalizedTicker} />
+            </Suspense>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

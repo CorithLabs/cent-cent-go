@@ -1,13 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   ComposedChart,
-  Line,
   Bar,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
+  ReferenceLine,
+  defs,
+  LinearGradient,
+  Stop,
 } from 'recharts';
 import { useOHLCV, ChartRange, OHLCVBar } from '../../hooks/useOHLCV';
 import { downloadOHLCVAsCSV } from '../../utils/csvExport';
@@ -28,55 +32,57 @@ type ChartMode = 'line' | 'candlestick';
 
 interface PriceChartProps {
   ticker: string;
-  /**
-   * Optional controlled range. When provided, PriceChart uses this value
-   * instead of its internal state. Pair with onRangeChange to keep a parent
-   * (e.g. StockChartPage) in sync with IndicatorsPanel.
-   */
-  range?: ChartRange;
-  /**
-   * Called whenever the user clicks a range button. Required when `range` is
-   * controlled. When omitted, PriceChart self-manages range internally.
-   */
-  onRangeChange?: (range: ChartRange) => void;
 }
+
+// Design token values (resolved from CSS for use in Recharts props)
+// These must match tokens.css — Recharts SVG props can't consume CSS vars directly.
+const THEME = {
+  gridColor:    'rgba(30, 37, 48, 1)',   // --color-bg-elevated
+  axisColor:    '#64748B',               // --color-text-muted
+  accentColor:  '#3B82F6',               // --color-accent
+  positiveColor:'#22C55E',              // --color-positive
+  negativeColor:'#EF4444',              // --color-negative
+  tooltipBg:    '#1E2530',               // --color-bg-elevated
+  fontMono:     "'JetBrains Mono', ui-monospace, monospace",
+  textXs:       '11px',
+};
 
 /**
  * PriceChart — interactive OHLCV chart with range selector, line/candlestick toggle,
- * hover tooltip, and CSV download.
- * AC: Range buttons switch data range. Toggle between line and candlestick.
- * AC: Hover tooltip shows OHLCV. Download CSV button exports visible data.
- * AC: Large datasets (5Y daily) windowed to avoid frame drops.
+ * hover tooltip, and CSV download. Themed with dark design tokens.
  *
- * Range can be controlled by a parent via the `range` + `onRangeChange` props,
- * or left uncontrolled (self-managed). Both modes are backward compatible.
+ * AC: Chart background uses --color-bg-surface; container has border-radius 8px + --shadow-card.
+ * AC: Grid lines use --color-bg-elevated.
+ * AC: X/Y axis ticks use --font-mono, --text-xs, --color-text-muted.
+ * AC: Line: --color-accent; area fill: 10% accent gradient.
+ * AC: Custom OHLCV tooltip in dark card with mono numbers.
+ * AC: Range selector: pill buttons, active = --color-accent bg.
+ * AC: No Recharts default borders/outer strokes.
+ * AC: Responsive (width=100%, height from ref).
  */
-export const PriceChart: React.FC<PriceChartProps> = ({
-  ticker,
-  range: rangeProp,
-  onRangeChange,
-}) => {
-  // Internal state used only when range is not controlled by a parent
-  const [rangeInternal, setRangeInternal] = useState<ChartRange>('1m');
-  const range = rangeProp ?? rangeInternal;
-
-  const handleRangeChange = (r: ChartRange) => {
-    if (onRangeChange) {
-      onRangeChange(r);
-    } else {
-      setRangeInternal(r);
-    }
-  };
-
+export const PriceChart: React.FC<PriceChartProps> = ({ ticker }) => {
+  const [range, setRange] = useState<ChartRange>('1m');
   const [mode, setMode] = useState<ChartMode>('line');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [chartHeight, setChartHeight] = useState(340);
 
   const { ohlcv, isLoading, error } = useOHLCV(ticker, range);
 
-  // Window data for large datasets to keep rendering fast
+  // Responsive height — 340px minimum, caps at 420px
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const obs = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? 0;
+      setChartHeight(Math.min(420, Math.max(240, Math.round(width * 0.38))));
+    });
+    obs.observe(containerRef.current);
+    return () => obs.disconnect();
+  }, []);
+
+  // Window data for large datasets
   const chartData = useMemo(() => {
     if (!ohlcv?.data) return [];
     const data = ohlcv.data;
-    // For 5Y daily (~1260 bars), subsample to 500 points for canvas perf
     if (data.length > 500) {
       const step = Math.ceil(data.length / 500);
       return data.filter((_, i) => i % step === 0);
@@ -87,7 +93,6 @@ export const PriceChart: React.FC<PriceChartProps> = ({
   const hasData = chartData.length > 0;
   const isNewIPO = ohlcv && ohlcv.data.length < 5 && range === '5y';
 
-  // Format x-axis timestamps
   const formatXAxis = (timestamp: string) => {
     const d = new Date(timestamp);
     if (range === '1d' || range === '5d') {
@@ -97,28 +102,23 @@ export const PriceChart: React.FC<PriceChartProps> = ({
   };
 
   const handleDownloadCSV = () => {
-    if (ohlcv?.data) {
-      downloadOHLCVAsCSV(ticker, range, ohlcv.data);
-    }
+    if (ohlcv?.data) downloadOHLCVAsCSV(ticker, range, ohlcv.data);
   };
 
-  // Build accessible data table rows
-  const accessibleRows = chartData.slice(-10); // last 10 for the table
+  const accessibleRows = chartData.slice(-10);
 
   return (
     <section className="price-chart" aria-labelledby="chart-heading">
       <div className="price-chart__toolbar">
-        <h2 id="chart-heading" className="price-chart__title">
-          Price History
-        </h2>
+        <h2 id="chart-heading" className="price-chart__title">Price History</h2>
 
-        {/* Range selector */}
+        {/* Range selector — pill buttons */}
         <div className="price-chart__ranges" role="group" aria-label="Select time range">
           {RANGES.map((r) => (
             <button
               key={r}
               className={`price-chart__range-btn${range === r ? ' price-chart__range-btn--active' : ''}`}
-              onClick={() => handleRangeChange(r)}
+              onClick={() => setRange(r)}
               aria-pressed={range === r}
               aria-label={`Show ${RANGE_LABELS[r]} range`}
             >
@@ -141,29 +141,26 @@ export const PriceChart: React.FC<PriceChartProps> = ({
             onClick={() => setMode('candlestick')}
             aria-pressed={mode === 'candlestick'}
           >
-            Candlestick
+            Candle
           </button>
         </div>
 
-        {/* CSV Download */}
         <button
           className="price-chart__download-btn"
           onClick={handleDownloadCSV}
           disabled={!hasData}
           aria-label="Download chart data as CSV"
         >
-          ↓ Download CSV
+          ↓ CSV
         </button>
       </div>
 
-      {/* New IPO notice */}
       {isNewIPO && (
         <p className="price-chart__notice" role="note">
           Limited history available — this stock recently went public.
         </p>
       )}
 
-      {/* Chart area */}
       {isLoading && (
         <div className="price-chart__loading" aria-label="Loading chart data" aria-busy="true">
           <div className="price-chart__skeleton" />
@@ -171,59 +168,103 @@ export const PriceChart: React.FC<PriceChartProps> = ({
       )}
 
       {error && (
-        <div className="price-chart__error" role="alert">
-          {error}
-        </div>
+        <div className="price-chart__error" role="alert">{error}</div>
       )}
 
       {!isLoading && !error && hasData && (
-        <div className="price-chart__canvas-wrapper">
-          <ResponsiveContainer width="100%" height={340}>
+        <div className="price-chart__canvas-wrapper" ref={containerRef} style={{ height: chartHeight }}>
+          <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
               data={chartData}
-              margin={{ top: 8, right: 16, left: 0, bottom: 8 }}
+              margin={{ top: 8, right: 8, left: 0, bottom: 8 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+              {/* Gradient fill for area under price line */}
+              <defs>
+                <linearGradient id={`accentGrad-${ticker}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={THEME.accentColor} stopOpacity={0.18} />
+                  <stop offset="100%" stopColor={THEME.accentColor} stopOpacity={0.01} />
+                </linearGradient>
+              </defs>
+
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke={THEME.gridColor}
+                vertical={false}
+              />
               <XAxis
                 dataKey="timestamp"
                 tickFormatter={formatXAxis}
-                tick={{ fontSize: 11, fill: 'var(--color-muted)' }}
+                tick={{ fontSize: THEME.textXs, fill: THEME.axisColor, fontFamily: THEME.fontMono }}
                 tickLine={false}
+                axisLine={false}
               />
               <YAxis
                 domain={['auto', 'auto']}
-                tickFormatter={(v: number) => `$${v.toFixed(0)}`}
-                tick={{ fontSize: 11, fill: 'var(--color-muted)' }}
+                tickFormatter={(v: number) => `$${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v.toFixed(0)}`}
+                tick={{ fontSize: THEME.textXs, fill: THEME.axisColor, fontFamily: THEME.fontMono }}
                 tickLine={false}
                 axisLine={false}
-                width={60}
+                width={56}
               />
               <Tooltip
                 content={<OHLCVTooltip />}
+                cursor={{ stroke: THEME.axisColor, strokeWidth: 1, strokeDasharray: '4 2' }}
               />
+
               {mode === 'line' ? (
-                <Line
-                  type="monotone"
-                  dataKey="close"
-                  stroke="var(--color-primary)"
-                  strokeWidth={2}
-                  dot={false}
-                  name="Close"
-                />
-              ) : (
-                /* Candlestick approximation using bars — real candlestick needs D3 */
                 <>
-                  <Bar dataKey="low" fill="transparent" stackId="candle" />
-                  <Bar
+                  <Area
+                    type="monotone"
                     dataKey="close"
-                    stackId="candle"
-                    fill="var(--color-primary)"
+                    stroke={THEME.accentColor}
+                    strokeWidth={2}
+                    fill={`url(#accentGrad-${ticker})`}
+                    dot={false}
+                    activeDot={{ r: 4, fill: THEME.accentColor, stroke: 'none' }}
                     name="Close"
                   />
                 </>
+              ) : (
+                /* Candlestick approximation — bars colored by price direction */
+                <>
+                  <Bar
+                    dataKey="volume"
+                    yAxisId={0}
+                    fill={THEME.gridColor}
+                    opacity={0.5}
+                    name="Volume"
+                    radius={[2, 2, 0, 0]}
+                  />
+                  {chartData.map((bar: OHLCVBar, idx) => {
+                    const isUp = bar.close >= bar.open;
+                    return (
+                      <ReferenceLine
+                        key={idx}
+                        x={bar.timestamp}
+                        stroke={isUp ? THEME.positiveColor : THEME.negativeColor}
+                        strokeWidth={4}
+                        strokeOpacity={0.8}
+                        segment={[
+                          { x: bar.timestamp, y: Math.min(bar.open, bar.close) },
+                          { x: bar.timestamp, y: Math.max(bar.open, bar.close) },
+                        ]}
+                      />
+                    );
+                  })}
+                </>
               )}
-              {/* Volume as a faint bar at the bottom */}
-              <Bar dataKey="volume" yAxisId={1} fill="var(--color-border)" opacity={0.4} />
+
+              {/* Faint volume bars */}
+              {mode === 'line' && (
+                <Bar
+                  dataKey="volume"
+                  yAxisId={0}
+                  fill={THEME.gridColor}
+                  opacity={0.35}
+                  name="Volume"
+                  radius={[2, 2, 0, 0]}
+                />
+              )}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -269,12 +310,15 @@ export const PriceChart: React.FC<PriceChartProps> = ({
   );
 };
 
-// Custom tooltip showing all OHLCV values
-const OHLCVTooltip: React.FC<{ active?: boolean; payload?: any[]; label?: string }> = ({
-  active,
-  payload,
-  label,
-}) => {
+/**
+ * Custom dark tooltip — OHLCV values in --color-bg-elevated card with mono font.
+ * Positioned to avoid viewport overflow on first/last data points.
+ */
+const OHLCVTooltip: React.FC<{
+  active?: boolean;
+  payload?: any[];
+  label?: string;
+}> = ({ active, payload, label }) => {
   if (!active || !payload || payload.length === 0) return null;
   const bar: OHLCVBar = payload[0]?.payload;
   if (!bar) return null;
@@ -286,14 +330,17 @@ const OHLCVTooltip: React.FC<{ active?: boolean; payload?: any[]; label?: string
       aria-label={`OHLCV data for ${label}`}
     >
       <p className="price-chart__tooltip-date">
-        {new Date(bar.timestamp).toLocaleString()}
+        {new Date(bar.timestamp).toLocaleString('en-US', {
+          month: 'short', day: 'numeric',
+          hour: '2-digit', minute: '2-digit',
+        })}
       </p>
       <dl>
         <div><dt>Open</dt><dd>{formatPrice(bar.open)}</dd></div>
         <div><dt>High</dt><dd>{formatPrice(bar.high)}</dd></div>
         <div><dt>Low</dt><dd>{formatPrice(bar.low)}</dd></div>
         <div><dt>Close</dt><dd>{formatPrice(bar.close)}</dd></div>
-        <div><dt>Volume</dt><dd>{bar.volume.toLocaleString()}</dd></div>
+        <div><dt>Vol</dt><dd>{bar.volume.toLocaleString()}</dd></div>
       </dl>
     </div>
   );
