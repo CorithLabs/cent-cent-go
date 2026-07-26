@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   ComposedChart,
-  Line,
   Bar,
   Area,
   XAxis,
