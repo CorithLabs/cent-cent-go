@@ -1,6 +1,7 @@
 import React, { useState, lazy, Suspense, useCallback } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useStockQuote } from '../hooks/useStockQuote';
+import { useWatchlist } from '../hooks/useWatchlist';
 import { StockOverviewHeader } from '../components/StockOverviewHeader/StockOverviewHeader';
 import { formatPrice, formatPct } from '../utils/formatters';
 import './StockDetailPage.css';
@@ -28,6 +29,8 @@ const TABS: { key: TabKey; label: string }[] = [
  * AC: Overview: StockOverviewHeader (full metrics) + collapsible ELI5Panel.
  * AC: Lazy-rendered panels — data already fetched is not re-fetched on tab switch.
  * AC: Page bg --color-bg-primary; cards --color-bg-surface + --shadow-card.
+ * AC: 'Add to Watchlist' button shown on every stock detail page.
+ * AC: Watchlist limited to 50 stocks; warning shown at limit.
  */
 const StockDetailPage: React.FC = () => {
   const { ticker = '' } = useParams<{ ticker: string }>();
@@ -36,12 +39,14 @@ const StockDetailPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = (searchParams.get('tab') ?? 'overview') as TabKey;
 
-  // Track which panels have been activated — only mount them once (no re-fetch on tab switch)
   const [mountedTabs, setMountedTabs] = useState<Set<TabKey>>(new Set(['overview']));
-
   const [eli5Expanded, setEli5Expanded] = useState(false);
+  const [watchlistMessage, setWatchlistMessage] = useState<string | null>(null);
 
   const { quote, isLoading, error, notFound } = useStockQuote(normalizedTicker);
+  const { addTicker, removeTicker, isWatching } = useWatchlist();
+
+  const watching = isWatching(normalizedTicker);
 
   const handleTabChange = useCallback(
     (tab: TabKey) => {
@@ -52,8 +57,23 @@ const StockDetailPage: React.FC = () => {
         return next;
       });
     },
-    [setSearchParams]
+    [setSearchParams],
   );
+
+  const handleWatchlistToggle = () => {
+    if (watching) {
+      removeTicker(normalizedTicker);
+      setWatchlistMessage(`${normalizedTicker} removed from watchlist.`);
+    } else {
+      const result = addTicker(normalizedTicker);
+      if (result === 'limit_exceeded') {
+        setWatchlistMessage('Watchlist is full (50 stocks). Remove one to add another.');
+      } else if (result === 'added') {
+        setWatchlistMessage(`${normalizedTicker} added to watchlist.`);
+      }
+    }
+    setTimeout(() => setWatchlistMessage(null), 3000);
+  };
 
   // ── Error states ──────────────────────────────────────────────────────────
 
@@ -112,7 +132,28 @@ const StockDetailPage: React.FC = () => {
             </span>
           </span>
           <span className="stock-detail__sticky-name">{quote.name}</span>
+
+          {/* Add to Watchlist button */}
+          <button
+            className={`stock-detail__watchlist-btn${watching ? ' stock-detail__watchlist-btn--watching' : ''}`}
+            onClick={handleWatchlistToggle}
+            aria-label={watching ? `Remove ${normalizedTicker} from watchlist` : `Add ${normalizedTicker} to watchlist`}
+            aria-pressed={watching}
+          >
+            {watching ? '★ Watching' : '☆ Watchlist'}
+          </button>
         </div>
+
+        {/* Watchlist feedback message */}
+        {watchlistMessage && (
+          <p
+            className="stock-detail__watchlist-msg"
+            role="status"
+            aria-live="polite"
+          >
+            {watchlistMessage}
+          </p>
+        )}
 
         {/* ── Tab bar ───────────────────────────────────────────────── */}
         <nav
@@ -151,7 +192,7 @@ const StockDetailPage: React.FC = () => {
             <>
               <StockOverviewHeader quote={quote} />
 
-              {/* ELI5 Panel — collapsed by default, expandable */}
+              {/* ELI5 Panel — collapsed by default */}
               <div className="stock-detail__eli5-section">
                 <button
                   className="stock-detail__eli5-toggle"

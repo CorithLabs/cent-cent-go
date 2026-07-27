@@ -18,6 +18,7 @@ type StockHandler struct {
 	metricsSvc    *services.MetricsService
 	financialsSvc *services.FinancialsService
 	eli5Svc       *services.ELI5Service
+	sectorSvc     *services.SectorService
 	db            *pgxpool.Pool
 }
 
@@ -30,6 +31,7 @@ func NewStockHandler(db *pgxpool.Pool) *StockHandler {
 		metricsSvc:    services.NewMetricsService(db),
 		financialsSvc: services.NewFinancialsService(db),
 		eli5Svc:       services.NewELI5Service(db),
+		sectorSvc:     services.NewSectorService(db),
 		db:            db,
 	}
 }
@@ -127,7 +129,6 @@ func (h *StockHandler) GetIndicators(c *gin.Context) {
 // GetMetrics handles GET /api/stocks/:ticker/metrics
 // AC: Returns ticker, fiscalPeriod, lastUpdated, and metrics object.
 // AC: Returns 404 for unknown tickers.
-// AC: Fiscal period and lastUpdated shown on every metric card.
 func (h *StockHandler) GetMetrics(c *gin.Context) {
 	ticker := strings.ToUpper(c.Param("ticker"))
 
@@ -146,7 +147,6 @@ func (h *StockHandler) GetMetrics(c *gin.Context) {
 
 // GetFinancials handles GET /api/stocks/:ticker/financials?statement=&period=&limit=
 // AC: Returns 400 for invalid statement type.
-// AC: Gaps in data (new public company mid-year) shown as missing entries (nil), not zeros.
 func (h *StockHandler) GetFinancials(c *gin.Context) {
 	ticker := strings.ToUpper(c.Param("ticker"))
 	statement := c.DefaultQuery("statement", "income")
@@ -189,7 +189,6 @@ func (h *StockHandler) GetFinancials(c *gin.Context) {
 // GetELI5 handles GET /api/stocks/:ticker/eli5
 // AC: Returns structured analysis object — no LLM call server-side.
 // AC: Response cached per ticker for 1 hour.
-// AC: Returns 404 for unknown tickers.
 func (h *StockHandler) GetELI5(c *gin.Context) {
 	ticker := strings.ToUpper(c.Param("ticker"))
 
@@ -206,7 +205,42 @@ func (h *StockHandler) GetELI5(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-// GetBatchQuotes handles GET /api/stocks/quotes?tickers=
+// GetBatchQuotes handles GET /api/stocks/quotes?tickers=AAPL,MSFT,...
+// AC: Returns { quotes: [{ ticker, price, change, changePct, lastUpdated }] }
+// AC: Returns 400 for more than 50 tickers.
+// AC: Reuses StockQuoteService via SectorService — no new Polygon client.
 func (h *StockHandler) GetBatchQuotes(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "not yet implemented"})
+	tickersParam := c.Query("tickers")
+	if tickersParam == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "tickers query parameter is required",
+		})
+		return
+	}
+
+	rawTickers := strings.Split(tickersParam, ",")
+	var tickers []string
+	for _, t := range rawTickers {
+		t = strings.TrimSpace(strings.ToUpper(t))
+		if t != "" {
+			tickers = append(tickers, t)
+		}
+	}
+
+	if len(tickers) > 50 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "maximum 50 tickers allowed per batch request",
+		})
+		return
+	}
+
+	result, err := h.sectorSvc.GetBatchQuotes(c.Request.Context(), tickers)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to fetch batch quotes",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }
