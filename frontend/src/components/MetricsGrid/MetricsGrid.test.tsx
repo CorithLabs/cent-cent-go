@@ -1,8 +1,15 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { MetricsGrid } from './MetricsGrid';
 import { MetricsResponse } from '../../hooks/useMetrics';
+
+// The "What is this?" concept buttons are gated by a live /api/learn/:slug
+// availability check; treat every concept as available in these unit tests.
+vi.mock('../ConceptSlideOver/ConceptSlideOver', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('../ConceptSlideOver/ConceptSlideOver')>();
+  return { ...mod, useConceptLinkAvailability: () => true };
+});
 
 const fullMetrics: MetricsResponse = {
   ticker: 'AAPL',
@@ -59,7 +66,7 @@ describe('MetricsGrid — v1.5 premium layout', () => {
 
   it('renders fiscal period and last updated date', () => {
     renderGrid(fullMetrics);
-    expect(screen.getByText(/Q4 2024/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Q4 2024/)[0]).toBeInTheDocument();
     expect(screen.getByText(/Updated/i)).toBeInTheDocument();
   });
 
@@ -113,7 +120,7 @@ describe('MetricsGrid — v1.5 premium layout', () => {
 
   it('renders "What is this?" learn links for all 7 metrics', () => {
     renderGrid(fullMetrics);
-    const links = screen.getAllByRole('link', { name: /what is .+learn more/i });
+    const links = screen.getAllByRole('button', { name: /what is .+open concept explainer/i });
     expect(links).toHaveLength(7);
   });
 

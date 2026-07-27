@@ -184,7 +184,7 @@ export const MetricsGrid: React.FC<MetricsGridProps> = ({ data, isLoading }) => 
 
       <dl className="metrics-grid__list" aria-label="Financial metrics">
         {METRIC_DEFS.map((metricDef) => {
-          const { key, label, format, naReason, isChangePct } = metricDef;
+          const { key, format, naReason, isChangePct } = metricDef;
           const rawValue = data.metrics[key];
           const isDividend = key === 'dividendYield';
           const isNA = rawValue === null || rawValue === undefined;
