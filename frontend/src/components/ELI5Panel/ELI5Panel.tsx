@@ -108,7 +108,8 @@ export const ELI5Panel: React.FC<ELI5PanelProps> = ({ ticker }) => {
       {/* Chrome AI upgrade notice */}
       {!aiAvailable && (
         <p className="eli5-panel__ai-notice" role="note">
-          Upgrade to Chrome 127+ for full ELI5 explanations powered by on-device AI.
+          Showing structured labels. For plain-English AI explanations, enable Chrome's
+          built-in on-device AI (Prompt API) — see chrome://flags.
         </p>
       )}
 
