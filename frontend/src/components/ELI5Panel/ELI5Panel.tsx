@@ -36,7 +36,7 @@ export const ELI5Panel: React.FC<ELI5PanelProps> = ({ ticker }) => {
     let cancelled = false;
 
     const generateAll = async () => {
-      for (const section of data.sections) {
+      for (const section of data.sections ?? []) {
         if (cancelled) break;
         const narrative = await generateELI5Narrative(section);
         if (!cancelled && narrative) {
@@ -83,7 +83,8 @@ export const ELI5Panel: React.FC<ELI5PanelProps> = ({ ticker }) => {
   }
 
   const badge = sentimentBadge(data.overallSentiment);
-  const hasLimitedData = data.sections.length === 0;
+  const sections = data.sections ?? [];
+  const hasLimitedData = sections.length === 0;
 
   return (
     <section className="eli5-panel" aria-labelledby="eli5-heading">
@@ -122,7 +123,7 @@ export const ELI5Panel: React.FC<ELI5PanelProps> = ({ ticker }) => {
       {/* Section cards */}
       {!hasLimitedData && (
         <div className="eli5-panel__sections" aria-label="ELI5 section cards">
-          {data.sections.map((section: ELI5Section) => {
+          {sections.map((section: ELI5Section) => {
             const narrative = narratives[section.topic];
             const isExpanded = expandedTopics.has(section.topic);
 
