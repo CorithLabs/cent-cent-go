@@ -2,11 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-	"os"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -43,20 +38,14 @@ type OHLCVResult struct {
 	LastUpdated string     `json:"lastUpdated"`
 }
 
-// OHLCVService fetches and caches OHLCV data.
+// OHLCVService fetches and caches OHLCV data from Yahoo Finance.
 type OHLCVService struct {
-	db         *pgxpool.Pool
-	httpClient *http.Client
-	apiKey     string
+	db *pgxpool.Pool
 }
 
 // NewOHLCVService creates a new OHLCVService.
 func NewOHLCVService(db *pgxpool.Pool) *OHLCVService {
-	return &OHLCVService{
-		db:         db,
-		httpClient: &http.Client{Timeout: 10 * time.Second},
-		apiKey:     os.Getenv("POLYGON_API_KEY"),
-	}
+	return &OHLCVService{db: db}
 }
 
 // IsValidRangeInterval returns true if the range+interval combo is allowed.
@@ -83,13 +72,13 @@ func (s *OHLCVService) GetHistory(ctx context.Context, ticker, rangeStr, interva
 			Range:       rangeStr,
 			Interval:    interval,
 			Data:        bars,
-			DataSource:  "polygon (cached)",
+			DataSource:  "yahoo (cached)",
 			LastUpdated: time.Now().UTC().Format(time.RFC3339),
 		}, nil
 	}
 
 	// Cache miss — fetch from Polygon.io
-	bars, err = s.fetchFromPolygon(ctx, ticker, rangeStr, interval)
+	bars, err = s.fetchFromYahoo(ctx, ticker, rangeStr, interval)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +91,7 @@ func (s *OHLCVService) GetHistory(ctx context.Context, ticker, rangeStr, interva
 		Range:       rangeStr,
 		Interval:    interval,
 		Data:        bars,
-		DataSource:  "polygon",
+		DataSource:  "yahoo",
 		LastUpdated: time.Now().UTC().Format(time.RFC3339),
 	}, nil
 }
@@ -153,96 +142,78 @@ func (s *OHLCVService) storeCache(ctx context.Context, ticker, interval string, 
 	return nil
 }
 
-// ── Polygon.io Aggs fetch ─────────────────────────────────────────────────────
+// ── Yahoo Finance fetch ───────────────────────────────────────────────────────
 
-// polygonAggsResponse is the Polygon.io /v2/aggs/ticker response.
-type polygonAggsResponse struct {
-	Ticker       string `json:"ticker"`
-	ResultsCount int    `json:"resultsCount"`
-	Results      []struct {
-		O  float64 `json:"o"`  // open
-		H  float64 `json:"h"`  // high
-		L  float64 `json:"l"`  // low
-		C  float64 `json:"c"`  // close
-		V  float64 `json:"v"`  // volume
-		T  int64   `json:"t"`  // unix milliseconds
-		VW float64 `json:"vw"` // vwap
-	} `json:"results"`
-	Status string `json:"status"`
-}
-
-// intervalToPolygon converts our interval keys to Polygon.io multiplier+timespan.
-func intervalToPolygon(interval string) (int, string) {
+// intervalToYahoo maps our interval keys to Yahoo's chart interval values.
+func intervalToYahoo(interval string) string {
 	switch interval {
 	case "1m":
-		return 1, "minute"
+		return "1m"
 	case "5m":
-		return 5, "minute"
+		return "5m"
 	case "1h":
-		return 1, "hour"
+		return "60m"
 	case "1d":
-		return 1, "day"
+		return "1d"
 	default:
-		return 1, "day"
+		return "1d"
 	}
 }
 
-func (s *OHLCVService) fetchFromPolygon(ctx context.Context, ticker, rangeStr, interval string) ([]OHLCVBar, error) {
-	from := rangeStart(rangeStr)
-	to := time.Now().UTC()
+// rangeToYahoo maps our range keys to Yahoo's chart range values.
+func rangeToYahoo(rangeStr string) string {
+	switch rangeStr {
+	case "1d":
+		return "1d"
+	case "5d":
+		return "5d"
+	case "1m":
+		return "1mo"
+	case "6m":
+		return "6mo"
+	case "1y":
+		return "1y"
+	case "5y":
+		return "5y"
+	default:
+		return "1mo"
+	}
+}
 
-	multiplier, timespan := intervalToPolygon(interval)
-	fromStr := from.Format("2006-01-02")
-	toStr := to.Format("2006-01-02")
-
-	url := fmt.Sprintf(
-		"https://api.polygon.io/v2/aggs/ticker/%s/range/%d/%s/%s/%s?adjusted=true&sort=asc&limit=50000&apiKey=%s",
-		ticker, multiplier, timespan, fromStr, toStr, s.apiKey,
-	)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+func (s *OHLCVService) fetchFromYahoo(ctx context.Context, ticker, rangeStr, interval string) ([]OHLCVBar, error) {
+	chart, err := getYahooClient().getChart(ctx, yahooSymbol(ticker), rangeToYahoo(rangeStr), intervalToYahoo(interval))
 	if err != nil {
 		return nil, err
 	}
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("polygon aggs request failed: %w", err)
+	if len(chart.Indicators.Quote) == 0 {
+		return []OHLCVBar{}, nil
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("ticker %s not found", ticker)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("polygon returned %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var result polygonAggsResponse
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, err
-	}
-
-	bars := make([]OHLCVBar, 0, len(result.Results))
+	q := chart.Indicators.Quote[0]
 	now := time.Now().UTC()
 
-	for _, r := range result.Results {
-		ts := time.UnixMilli(r.T).UTC()
-		// Flag partial intraday bar (last bar within current trading day)
+	bars := make([]OHLCVBar, 0, len(chart.Timestamps))
+	for i, tsSec := range chart.Timestamps {
+		if i >= len(q.Open) || i >= len(q.High) || i >= len(q.Low) || i >= len(q.Close) {
+			break
+		}
+		// Yahoo emits null (decoded as 0) for non-trading gap rows — skip them.
+		if q.Open[i] == 0 && q.High[i] == 0 && q.Low[i] == 0 && q.Close[i] == 0 {
+			continue
+		}
+		ts := time.Unix(tsSec, 0).UTC()
 		partial := interval != "1d" && ts.Add(parseDuration(interval)).After(now)
 
+		var vol int64
+		if i < len(q.Volume) {
+			vol = q.Volume[i]
+		}
 		bars = append(bars, OHLCVBar{
 			Timestamp: ts.Format(time.RFC3339),
-			Open:      r.O,
-			High:      r.H,
-			Low:       r.L,
-			Close:     r.C,
-			Volume:    int64(r.V),
+			Open:      q.Open[i],
+			High:      q.High[i],
+			Low:       q.Low[i],
+			Close:     q.Close[i],
+			Volume:    vol,
 			Partial:   partial,
 		})
 	}

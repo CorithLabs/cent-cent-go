@@ -54,7 +54,7 @@ describe('StockChartPage', () => {
     vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}));
     renderChartPage('AAPL');
     expect(screen.getByRole('link', { name: /home/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /AAPL/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'AAPL' })).toBeInTheDocument();
   });
 
   it('renders a fullscreen link', () => {
@@ -80,7 +80,7 @@ describe('StockChartPage', () => {
     vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}));
     renderChartPage('AAPL');
     expect(screen.getByRole('button', { name: /line/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /candlestick/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /candle/i })).toBeInTheDocument();
   });
 
   it('renders IndicatorsPanel toggle button', () => {

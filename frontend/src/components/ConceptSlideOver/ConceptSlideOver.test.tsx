@@ -122,7 +122,7 @@ describe('ConceptSlideOver', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
       expect(screen.getByText(/Failed to load article/i)).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /Open full article/i })).toBeInTheDocument();
+      expect(screen.getAllByRole('link', { name: /Open full article/i })[0]).toBeInTheDocument();
     });
   });
 

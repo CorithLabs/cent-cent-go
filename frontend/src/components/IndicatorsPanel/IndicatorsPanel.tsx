@@ -90,6 +90,7 @@ export const IndicatorsPanel: React.FC<IndicatorsPanelProps> = ({
                 <button
                   className={`indicators-panel__indicator-btn${isActive ? ' indicators-panel__indicator-btn--active' : ''}${isUnavailable ? ' indicators-panel__indicator-btn--unavailable' : ''}`}
                   onClick={() => !isUnavailable && onToggle(config.key)}
+                  aria-label={`Toggle ${config.label}`}
                   aria-pressed={isActive}
                   aria-disabled={isUnavailable}
                   disabled={isUnavailable}

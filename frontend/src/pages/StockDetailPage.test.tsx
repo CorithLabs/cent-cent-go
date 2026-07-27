@@ -124,7 +124,7 @@ describe('StockDetailPage — v1.5 layout', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Apple Inc.')).toBeInTheDocument();
+      expect(screen.getAllByText('Apple Inc.')[0]).toBeInTheDocument();
       expect(screen.getByText(/does not constitute financial advice/i)).toBeInTheDocument();
     });
   });

@@ -54,7 +54,7 @@ describe('WatchlistPage', () => {
 
     renderPage();
 
-    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('tickers=AAPL,MSFT'));
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('tickers=AAPL%2CMSFT'));
 
     await waitFor(() => {
       expect(screen.getByText('AAPL')).toBeInTheDocument();

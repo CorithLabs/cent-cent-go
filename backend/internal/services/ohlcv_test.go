@@ -63,16 +63,18 @@ func TestParseDuration(t *testing.T) {
 	assert.Equal(t, 24*time.Hour, parseDuration("unknown"))
 }
 
-func TestIntervalToPolygon(t *testing.T) {
-	mul, span := intervalToPolygon("5m")
-	assert.Equal(t, 5, mul)
-	assert.Equal(t, "minute", span)
+func TestIntervalToYahoo(t *testing.T) {
+	assert.Equal(t, "5m", intervalToYahoo("5m"))
+	assert.Equal(t, "1d", intervalToYahoo("1d"))
+	assert.Equal(t, "60m", intervalToYahoo("1h"))
+	assert.Equal(t, "1m", intervalToYahoo("1m"))
+	assert.Equal(t, "1d", intervalToYahoo("unknown"))
+}
 
-	mul, span = intervalToPolygon("1d")
-	assert.Equal(t, 1, mul)
-	assert.Equal(t, "day", span)
-
-	mul, span = intervalToPolygon("1h")
-	assert.Equal(t, 1, mul)
-	assert.Equal(t, "hour", span)
+func TestRangeToYahoo(t *testing.T) {
+	assert.Equal(t, "1d", rangeToYahoo("1d"))
+	assert.Equal(t, "1mo", rangeToYahoo("1m"))
+	assert.Equal(t, "6mo", rangeToYahoo("6m"))
+	assert.Equal(t, "5y", rangeToYahoo("5y"))
+	assert.Equal(t, "1mo", rangeToYahoo("unknown"))
 }

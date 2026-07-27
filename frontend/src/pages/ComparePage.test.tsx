@@ -109,7 +109,7 @@ describe('ComparePage', () => {
     fireEvent.change(input, { target: { value: 'MSFT' } });
     fireEvent.click(addBtn);
 
-    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('tickers=AAPL,MSFT'));
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('tickers=AAPL%2CMSFT'));
 
     await waitFor(() => {
       expect(screen.getByRole('img', { name: /comparison/i })).toBeInTheDocument();

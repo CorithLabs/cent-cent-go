@@ -98,7 +98,7 @@ const MetricsTable: React.FC<{ results: CompareTickerResult[] }> = ({ results })
  * of { date, TICKER1: value, TICKER2: value, ... } objects for Recharts.
  */
 function buildChartData(results: CompareTickerResult[]) {
-  const dateMap = new Map<string, Record<string, number>>();
+  const dateMap = new Map<string, { date: string; [ticker: string]: string | number }>();
 
   for (const result of results) {
     for (const point of result.normalizedPrices) {

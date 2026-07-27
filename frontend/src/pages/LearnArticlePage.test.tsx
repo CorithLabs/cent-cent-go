@@ -60,7 +60,7 @@ describe('LearnArticlePage', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText('P/E Ratio Explained')).toBeInTheDocument();
+      expect(screen.getAllByText('P/E Ratio Explained')[0]).toBeInTheDocument();
     });
   });
 

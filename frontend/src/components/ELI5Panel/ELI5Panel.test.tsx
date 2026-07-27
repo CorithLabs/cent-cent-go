@@ -77,7 +77,7 @@ describe('ELI5Panel', () => {
     });
   });
 
-  it('shows "Upgrade to Chrome 127+" notice when window.ai is unavailable', async () => {
+  it('shows AI-unavailable notice when window.ai is unavailable', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => mockELI5Response,
@@ -86,7 +86,7 @@ describe('ELI5Panel', () => {
     renderPanel();
 
     await waitFor(() => {
-      expect(screen.getByText(/upgrade to chrome 127\+/i)).toBeInTheDocument();
+      expect(screen.getByText(/enable chrome's built-in on-device AI/i)).toBeInTheDocument();
     });
   });
 

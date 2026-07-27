@@ -53,7 +53,7 @@ describe('EconomicsDetailPage', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText('CPI (Inflation)')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'CPI (Inflation)' })).toBeInTheDocument();
     });
 
     // Chart section
@@ -68,7 +68,7 @@ describe('EconomicsDetailPage', () => {
 
     renderPage();
 
-    await waitFor(() => screen.getByText('CPI (Inflation)'));
+    await waitFor(() => screen.getByRole('heading', { name: 'CPI (Inflation)' }));
 
     expect(screen.getByRole('button', { name: '1Y' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '5Y' })).toBeInTheDocument();
@@ -82,7 +82,7 @@ describe('EconomicsDetailPage', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ...mockIndicatorData, data: [] }) });
 
     renderPage();
-    await waitFor(() => screen.getByText('CPI (Inflation)'));
+    await waitFor(() => screen.getByRole('heading', { name: 'CPI (Inflation)' }));
 
     fireEvent.click(screen.getByRole('button', { name: '5Y' }));
     expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -97,7 +97,7 @@ describe('EconomicsDetailPage', () => {
 
     renderPage();
 
-    await waitFor(() => screen.getByText('CPI (Inflation)'));
+    await waitFor(() => screen.getByRole('heading', { name: 'CPI (Inflation)' }));
 
     expect(screen.getByText('What is this indicator?')).toBeInTheDocument();
     expect(screen.getByText('How is it calculated?')).toBeInTheDocument();
@@ -142,7 +142,7 @@ describe('EconomicsDetailPage', () => {
 
     renderPage();
 
-    await waitFor(() => screen.getByText('CPI (Inflation)'));
+    await waitFor(() => screen.getByRole('heading', { name: 'CPI (Inflation)' }));
 
     const breadcrumb = screen.getByRole('navigation', { name: /breadcrumb/i });
     expect(breadcrumb).toBeInTheDocument();
@@ -176,7 +176,7 @@ describe('EconomicsDetailPage', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => screen.getByText('CPI (Inflation)'));
+    await waitFor(() => screen.getByRole('heading', { name: 'CPI (Inflation)' }));
 
     // Switch to 10Y range
     mockFetch.mockResolvedValueOnce({ ok: true, json: async () => shortData });

@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { PriceChart } from '../components/PriceChart/PriceChart';
 import { IndicatorsPanel } from '../components/IndicatorsPanel/IndicatorsPanel';
-import { ChartRange } from '../hooks/useOHLCV';
+import { useIndicators } from '../hooks/useIndicators';
 import './StockChartPage.css';
 
 /**
@@ -23,9 +23,12 @@ const StockChartPage: React.FC = () => {
   const { ticker } = useParams<{ ticker: string }>();
   const upperTicker = ticker?.toUpperCase() ?? '';
 
-  // Shared range state: PriceChart is the source of truth; we lift it here
-  // so IndicatorsPanel can request data for the same window.
-  const [range, setRange] = useState<ChartRange>('1m');
+  // Indicator toggle state + data fetching live in useIndicators; the panel is
+  // driven by it (toggling a key fetches that indicator's series).
+  const { activeKeys, toggleIndicator, data: indicatorData, loadingKeys } = useIndicators(
+    upperTicker,
+    '1m',
+  );
 
   if (!upperTicker) {
     return (
@@ -59,23 +62,15 @@ const StockChartPage: React.FC = () => {
         </div>
       </header>
 
-      {/*
-        PriceChart handles its own data fetching via useOHLCV.
-        We pass onRangeChange so StockChartPage can keep IndicatorsPanel in sync.
-      */}
-      <PriceChart
-        ticker={upperTicker}
-        range={range}
-        onRangeChange={setRange}
-      />
+      {/* PriceChart fetches its own data via useOHLCV and owns its range. */}
+      <PriceChart ticker={upperTicker} />
 
-      {/*
-        IndicatorsPanel handles its own data fetching via useIndicators.
-        It receives the same ticker and range as PriceChart.
-      */}
+      {/* Indicator toggle panel below the chart (driven by useIndicators). */}
       <IndicatorsPanel
-        ticker={upperTicker}
-        range={range}
+        activeKeys={activeKeys}
+        loadingKeys={loadingKeys}
+        onToggle={toggleIndicator}
+        data={indicatorData}
       />
     </main>
   );
