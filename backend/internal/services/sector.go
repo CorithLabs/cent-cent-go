@@ -2,13 +2,8 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"os"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -70,22 +65,18 @@ type sp500Constituent struct {
 // ── Service ────────────────────────────────────────────────────────────────────
 
 // SectorService builds the S&P 500 sector heatmap.
-// AC: Reuses StockQuoteService — does not create a new Polygon HTTP client.
+// AC: Reuses StockQuoteService — prices come from the shared Yahoo-backed quote service.
 // AC: No background goroutine — data is assembled on-request from cached snapshots.
 type SectorService struct {
-	db         *pgxpool.Pool
-	httpClient *http.Client
-	apiKey     string
-	quoteSvc   *StockQuoteService
+	db       *pgxpool.Pool
+	quoteSvc *StockQuoteService
 }
 
 // NewSectorService creates a new SectorService.
 func NewSectorService(db *pgxpool.Pool) *SectorService {
 	return &SectorService{
-		db:         db,
-		httpClient: &http.Client{Timeout: 15 * time.Second},
-		apiKey:     os.Getenv("POLYGON_API_KEY"),
-		quoteSvc:   NewStockQuoteService(db),
+		db:       db,
+		quoteSvc: NewStockQuoteService(db),
 	}
 }
 
@@ -230,7 +221,7 @@ func (s *SectorService) getConstituents(ctx context.Context) ([]sp500Constituent
 	}
 
 	// Fetch from Polygon.io
-	fresh, err := s.fetchConstituentsFromPolygon(ctx)
+	fresh, err := s.fetchConstituents(ctx)
 	if err != nil {
 		// Fall back to cached (even stale) if available
 		if len(cached) > 0 {
@@ -245,79 +236,68 @@ func (s *SectorService) getConstituents(ctx context.Context) ([]sp500Constituent
 	return fresh, nil
 }
 
-// polygonTickersResponse is the Polygon /v3/reference/tickers?index=SPX response.
-type polygonTickersResponse struct {
-	Results []struct {
-		Ticker          string `json:"ticker"`
-		Name            string `json:"name"`
-		Market          string `json:"market"`
-		Locale          string `json:"locale"`
-		PrimaryExchange string `json:"primary_exchange"`
-		Type            string `json:"type"`
-		Sic             string `json:"sic_description"` // use as sector proxy
-	} `json:"results"`
-	NextURL string `json:"next_url"`
-	Status  string `json:"status"`
-}
-
-func (s *SectorService) fetchConstituentsFromPolygon(ctx context.Context) ([]sp500Constituent, error) {
-	// Polygon free tier: paginate through all results
-	var allConstituents []sp500Constituent
-	nextURL := fmt.Sprintf(
-		"https://api.polygon.io/v3/reference/tickers?index=SPX&limit=250&apiKey=%s",
-		s.apiKey,
-	)
-
-	maxPages := 10 // guard against infinite loops
-	for page := 0; page < maxPages && nextURL != ""; page++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, nextURL, nil)
-		if err != nil {
-			return allConstituents, err
-		}
-
-		resp, err := s.httpClient.Do(req)
-		if err != nil {
-			return allConstituents, fmt.Errorf("polygon constituents request failed: %w", err)
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			return allConstituents, err
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			return allConstituents, fmt.Errorf("polygon returned %d", resp.StatusCode)
-		}
-
-		var result polygonTickersResponse
-		if err := json.Unmarshal(body, &result); err != nil {
-			return allConstituents, err
-		}
-
-		now := time.Now().UTC()
-		for _, r := range result.Results {
-			sector := r.Sic
-			if sector == "" {
-				sector = "Other"
-			}
-			allConstituents = append(allConstituents, sp500Constituent{
-				Ticker:      r.Ticker,
-				Name:        r.Name,
-				Sector:      sector,
-				LastUpdated: now,
-			})
-		}
-
-		// Add apiKey to next_url if present
-		if result.NextURL != "" {
-			nextURL = result.NextURL + "&apiKey=" + s.apiKey
-		} else {
-			nextURL = ""
-		}
+// fetchConstituents returns a curated set of large-cap S&P 500 members grouped by
+// GICS sector. Yahoo Finance has no free constituent-list endpoint, so this static
+// set (a representative subset, not all 500) drives the sector heatmap. Prices,
+// changes, and market caps are still fetched live per ticker.
+func (s *SectorService) fetchConstituents(_ context.Context) ([]sp500Constituent, error) {
+	now := time.Now().UTC()
+	raw := []struct{ Ticker, Name, Sector string }{
+		{"AAPL", "Apple Inc.", "Technology"},
+		{"MSFT", "Microsoft Corp.", "Technology"},
+		{"NVDA", "NVIDIA Corp.", "Technology"},
+		{"AVGO", "Broadcom Inc.", "Technology"},
+		{"ORCL", "Oracle Corp.", "Technology"},
+		{"CRM", "Salesforce Inc.", "Technology"},
+		{"ADBE", "Adobe Inc.", "Technology"},
+		{"AMD", "Advanced Micro Devices", "Technology"},
+		{"GOOGL", "Alphabet Inc.", "Communication Services"},
+		{"META", "Meta Platforms Inc.", "Communication Services"},
+		{"NFLX", "Netflix Inc.", "Communication Services"},
+		{"DIS", "Walt Disney Co.", "Communication Services"},
+		{"T", "AT&T Inc.", "Communication Services"},
+		{"VZ", "Verizon Communications", "Communication Services"},
+		{"AMZN", "Amazon.com Inc.", "Consumer Discretionary"},
+		{"TSLA", "Tesla Inc.", "Consumer Discretionary"},
+		{"HD", "Home Depot Inc.", "Consumer Discretionary"},
+		{"MCD", "McDonald's Corp.", "Consumer Discretionary"},
+		{"NKE", "Nike Inc.", "Consumer Discretionary"},
+		{"WMT", "Walmart Inc.", "Consumer Staples"},
+		{"PG", "Procter & Gamble Co.", "Consumer Staples"},
+		{"KO", "Coca-Cola Co.", "Consumer Staples"},
+		{"PEP", "PepsiCo Inc.", "Consumer Staples"},
+		{"COST", "Costco Wholesale Corp.", "Consumer Staples"},
+		{"BRK-B", "Berkshire Hathaway Inc.", "Financials"},
+		{"JPM", "JPMorgan Chase & Co.", "Financials"},
+		{"V", "Visa Inc.", "Financials"},
+		{"MA", "Mastercard Inc.", "Financials"},
+		{"BAC", "Bank of America Corp.", "Financials"},
+		{"UNH", "UnitedHealth Group Inc.", "Health Care"},
+		{"JNJ", "Johnson & Johnson", "Health Care"},
+		{"LLY", "Eli Lilly and Co.", "Health Care"},
+		{"ABBV", "AbbVie Inc.", "Health Care"},
+		{"MRK", "Merck & Co. Inc.", "Health Care"},
+		{"CAT", "Caterpillar Inc.", "Industrials"},
+		{"GE", "GE Aerospace", "Industrials"},
+		{"HON", "Honeywell International", "Industrials"},
+		{"UPS", "United Parcel Service", "Industrials"},
+		{"XOM", "Exxon Mobil Corp.", "Energy"},
+		{"CVX", "Chevron Corp.", "Energy"},
+		{"NEE", "NextEra Energy Inc.", "Utilities"},
+		{"PLD", "Prologis Inc.", "Real Estate"},
+		{"AMT", "American Tower Corp.", "Real Estate"},
+		{"LIN", "Linde plc", "Materials"},
 	}
-
-	return allConstituents, nil
+	out := make([]sp500Constituent, 0, len(raw))
+	for _, r := range raw {
+		out = append(out, sp500Constituent{
+			Ticker:      r.Ticker,
+			Name:        r.Name,
+			Sector:      r.Sector,
+			LastUpdated: now,
+		})
+	}
+	return out, nil
 }
 
 func (s *SectorService) getCachedConstituents(ctx context.Context) ([]sp500Constituent, error) {
@@ -360,83 +340,68 @@ func (s *SectorService) upsertConstituents(ctx context.Context, constituents []s
 
 // ── Heatmap data ──────────────────────────────────────────────────────────────
 
-// buildHeatmapData fetches quote data for all constituents concurrently.
-// Returns stocks and a boolean indicating if some tickers failed (incomplete).
+// buildHeatmapData assembles per-ticker heatmap rows, using the 5-minute cache
+// where fresh and a single batched Yahoo quote request for the rest.
+// Returns the rows and a bool indicating some tickers were missing (incomplete).
 func (s *SectorService) buildHeatmapData(ctx context.Context, constituents []sp500Constituent) ([]HeatmapStock, bool) {
-	type result struct {
-		stock HeatmapStock
-		err   error
-	}
+	stocks := make([]HeatmapStock, 0, len(constituents))
+	bySector := make(map[string]sp500Constituent, len(constituents))
+	var toFetch []string
 
-	// Limit concurrency to avoid overwhelming Polygon.io
-	const maxConcurrent = 20
-	sem := make(chan struct{}, maxConcurrent)
-
-	var mu sync.Mutex
-	var stocks []HeatmapStock
-	var failCount int
-
-	wg := sync.WaitGroup{}
 	for _, c := range constituents {
-		wg.Add(1)
-		constituent := c
-
-		go func() {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
-			// Check heatmap cache first
-			cached, cacheErr := s.getHeatmapCached(ctx, constituent.Ticker)
-			if cacheErr == nil && cached != nil {
-				if time.Since(cached.LastUpdated) < heatmapCacheTTL {
-					mc := cached.MarketCap
-					mu.Lock()
-					stocks = append(stocks, HeatmapStock{
-						Ticker:    constituent.Ticker,
-						Name:      constituent.Name,
-						MarketCap: &mc,
-						Change:    cached.ChangePct,
-						Sector:    constituent.Sector,
-						Price:     cached.Price,
-					})
-					mu.Unlock()
-					return
-				}
-			}
-
-			// Fetch from quote service
-			quote, err := s.quoteSvc.GetQuote(ctx, constituent.Ticker)
-			if err != nil {
-				mu.Lock()
-				failCount++
-				mu.Unlock()
-				return
-			}
-
-			mc := float64(quote.MarketCap)
-			stock := HeatmapStock{
-				Ticker:    quote.Ticker,
-				Name:      quote.Name,
+		bySector[c.Ticker] = c
+		if cached, err := s.getHeatmapCached(ctx, c.Ticker); err == nil && cached != nil &&
+			time.Since(cached.LastUpdated) < heatmapCacheTTL {
+			mc := cached.MarketCap
+			stocks = append(stocks, HeatmapStock{
+				Ticker:    c.Ticker,
+				Name:      c.Name,
 				MarketCap: &mc,
-				Change:    quote.ChangePct,
-				Sector:    constituent.Sector,
-				Price:     quote.Price,
-				Halted:    quote.Status == "suspended",
-			}
-
-			mu.Lock()
-			stocks = append(stocks, stock)
-			mu.Unlock()
-
-			// Update heatmap cache (best-effort)
-			_ = s.upsertHeatmapCache(ctx, constituent.Ticker, constituent.Name,
-				constituent.Sector, mc, quote.ChangePct, quote.Price)
-		}()
+				Change:    cached.ChangePct,
+				Sector:    c.Sector,
+				Price:     cached.Price,
+			})
+			continue
+		}
+		toFetch = append(toFetch, c.Ticker)
 	}
-	wg.Wait()
 
-	return stocks, failCount > 0
+	if len(toFetch) == 0 {
+		return stocks, false
+	}
+
+	quotes, err := s.quoteSvc.GetQuotes(ctx, toFetch)
+	if err != nil {
+		// Whole batch failed — incomplete only if we also have nothing cached.
+		return stocks, len(stocks) == 0
+	}
+
+	incomplete := false
+	for _, tk := range toFetch {
+		q, ok := quotes[tk]
+		if !ok {
+			incomplete = true
+			continue
+		}
+		c := bySector[tk]
+		name := q.Name
+		if name == "" {
+			name = c.Name
+		}
+		mc := float64(q.MarketCap)
+		stocks = append(stocks, HeatmapStock{
+			Ticker:    tk,
+			Name:      name,
+			MarketCap: &mc,
+			Change:    q.ChangePct,
+			Sector:    c.Sector,
+			Price:     q.Price,
+			Halted:    q.Status == "suspended",
+		})
+		_ = s.upsertHeatmapCache(ctx, tk, c.Name, c.Sector, mc, q.ChangePct, q.Price)
+	}
+
+	return stocks, incomplete
 }
 
 // ── Heatmap cache ──────────────────────────────────────────────────────────────

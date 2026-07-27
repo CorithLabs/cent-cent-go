@@ -2,11 +2,7 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -15,20 +11,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// StockQuoteService fetches and caches stock quote data from Polygon.io.
+// StockQuoteService fetches and caches stock quote data from Yahoo Finance.
 type StockQuoteService struct {
-	db         *pgxpool.Pool
-	httpClient *http.Client
-	apiKey     string
+	db *pgxpool.Pool
 }
 
 // NewStockQuoteService creates a new StockQuoteService.
 func NewStockQuoteService(db *pgxpool.Pool) *StockQuoteService {
-	return &StockQuoteService{
-		db:         db,
-		httpClient: &http.Client{Timeout: 8 * time.Second},
-		apiKey:     os.Getenv("POLYGON_API_KEY"),
-	}
+	return &StockQuoteService{db: db}
 }
 
 // GetQuote returns the current quote for a ticker.
@@ -46,7 +36,7 @@ func (s *StockQuoteService) GetQuote(ctx context.Context, ticker string) (*model
 			return cached, nil
 		}
 		// Cache is stale — try to refresh, fall back to cached with stale=true
-		fresh, fetchErr := s.fetchFromPolygon(ctx, ticker)
+		fresh, fetchErr := s.fetchFromYahoo(ctx, ticker)
 		if fetchErr != nil {
 			cached.Stale = true
 			return cached, nil
@@ -56,7 +46,7 @@ func (s *StockQuoteService) GetQuote(ctx context.Context, ticker string) (*model
 	}
 
 	// No cache — must fetch
-	quote, err := s.fetchFromPolygon(ctx, ticker)
+	quote, err := s.fetchFromYahoo(ctx, ticker)
 	if err != nil {
 		return nil, err
 	}
@@ -118,190 +108,79 @@ func (s *StockQuoteService) upsertCache(ctx context.Context, q *models.StockQuot
 	return err
 }
 
-// ── Polygon.io fetch ──────────────────────────────────────────────────────────
+// ── Yahoo Finance fetch ───────────────────────────────────────────────────────
 
-// polygonSnapshotResponse is the Polygon.io /v2/snapshot/locale/us/markets/stocks/tickers/:ticker response.
-type polygonSnapshotResponse struct {
-	Ticker struct {
-		Ticker string `json:"ticker"`
-		Day    struct {
-			C  float64 `json:"c"` // close
-			O  float64 `json:"o"` // open
-			H  float64 `json:"h"` // high
-			L  float64 `json:"l"` // low
-			V  float64 `json:"v"` // volume
-			Vw float64 `json:"vw"` // vwap
-		} `json:"day"`
-		LastTrade struct {
-			P float64 `json:"p"` // price
-		} `json:"lastTrade"`
-		LastQuote struct {
-			P float64 `json:"p"` // bid
-			S float64 `json:"s"` // size
-		} `json:"lastQuote"`
-		Min struct {
-			C float64 `json:"c"`
-		} `json:"min"`
-		PrevDay struct {
-			C float64 `json:"c"` // previous close
-		} `json:"prevDay"`
-		TodaysChangePerc float64 `json:"todaysChangePerc"`
-		TodaysChange     float64 `json:"todaysChange"`
-		Updated          int64   `json:"updated"` // unix nanoseconds
-	} `json:"ticker"`
-	Status    string `json:"status"`
-	RequestID string `json:"request_id"`
-}
-
-// polygonTickerDetailsResponse is the Polygon.io /v3/reference/tickers/:ticker response.
-type polygonTickerDetailsResponse struct {
-	Results struct {
-		Ticker          string `json:"ticker"`
-		Name            string `json:"name"`
-		PrimaryExchange string `json:"primary_exchange"`
-		Type            string `json:"type"`
-		Active          bool   `json:"active"`
-		MarketCap       int64  `json:"market_cap"`
-		WeekHigh52      float64 `json:"week_high_52"`
-		WeekLow52       float64 `json:"week_low_52"`
-	} `json:"results"`
-	Status string `json:"status"`
-}
-
-func (s *StockQuoteService) fetchFromPolygon(ctx context.Context, ticker string) (*models.StockQuote, error) {
-	// Fetch snapshot (price, change, volume) and ticker details (name, market cap, 52w range) in parallel
-	type snapshotResult struct {
-		snap *polygonSnapshotResponse
-		err  error
-	}
-	type detailsResult struct {
-		details *polygonTickerDetailsResponse
-		err     error
-	}
-
-	snapCh := make(chan snapshotResult, 1)
-	detailsCh := make(chan detailsResult, 1)
-
-	go func() {
-		snap, err := s.fetchSnapshot(ctx, ticker)
-		snapCh <- snapshotResult{snap, err}
-	}()
-
-	go func() {
-		details, err := s.fetchTickerDetails(ctx, ticker)
-		detailsCh <- detailsResult{details, err}
-	}()
-
-	snapRes := <-snapCh
-	detailsRes := <-detailsCh
-
-	if snapRes.err != nil {
-		return nil, fmt.Errorf("polygon snapshot: %w", snapRes.err)
-	}
-	if detailsRes.err != nil {
-		return nil, fmt.Errorf("polygon ticker details: %w", detailsRes.err)
-	}
-
-	snap := snapRes.snap
-	details := detailsRes.details
-
-	// Use lastTrade price if available, fall back to day close
-	price := snap.Ticker.LastTrade.P
-	if price == 0 {
-		price = snap.Ticker.Day.C
-	}
-
-	status := "active"
-	if !details.Results.Active {
-		status = "delisted"
-	}
-
-	quote := &models.StockQuote{
-		Ticker:      ticker,
-		Name:        details.Results.Name,
-		Price:       price,
-		Change:      snap.Ticker.TodaysChange,
-		ChangePct:   snap.Ticker.TodaysChangePerc,
-		MarketCap:   details.Results.MarketCap,
-		Volume:      int64(snap.Ticker.Day.V),
-		Week52High:  details.Results.WeekHigh52,
-		Week52Low:   details.Results.WeekLow52,
-		Exchange:    details.Results.PrimaryExchange,
-		LastUpdated: time.Now().UTC(),
-		Status:      status,
-		Stale:       false,
-		DataSource:  "polygon",
-	}
-
-	return quote, nil
-}
-
-func (s *StockQuoteService) fetchSnapshot(ctx context.Context, ticker string) (*polygonSnapshotResponse, error) {
-	url := fmt.Sprintf(
-		"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/%s?apiKey=%s",
-		ticker, s.apiKey,
-	)
-	resp, err := s.doGet(ctx, url)
+func (s *StockQuoteService) fetchFromYahoo(ctx context.Context, ticker string) (*models.StockQuote, error) {
+	quotes, err := getYahooClient().getQuotes(ctx, []string{yahooSymbol(ticker)})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("yahoo quote: %w", err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
+	if len(quotes) == 0 || quotes[0].RegularMarketPrice == 0 {
 		return nil, fmt.Errorf("ticker %s not found", ticker)
 	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("polygon returned %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var result polygonSnapshotResponse
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, err
-	}
-	return &result, nil
+	return yahooToStockQuote(ticker, quotes[0]), nil
 }
 
-func (s *StockQuoteService) fetchTickerDetails(ctx context.Context, ticker string) (*polygonTickerDetailsResponse, error) {
-	url := fmt.Sprintf(
-		"https://api.polygon.io/v3/reference/tickers/%s?apiKey=%s",
-		ticker, s.apiKey,
-	)
-	resp, err := s.doGet(ctx, url)
+// GetQuotes fetches quotes for multiple tickers in a single Yahoo request and
+// caches each. Tickers Yahoo doesn't return are omitted from the map.
+func (s *StockQuoteService) GetQuotes(ctx context.Context, tickers []string) (map[string]*models.StockQuote, error) {
+	if len(tickers) == 0 {
+		return map[string]*models.StockQuote{}, nil
+	}
+	symToTicker := make(map[string]string, len(tickers))
+	syms := make([]string, 0, len(tickers))
+	for _, t := range tickers {
+		t = strings.ToUpper(t)
+		ys := yahooSymbol(t)
+		symToTicker[ys] = t
+		syms = append(syms, ys)
+	}
+	quotes, err := getYahooClient().getQuotes(ctx, syms)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("ticker %s not found in reference data", ticker)
+	out := make(map[string]*models.StockQuote, len(quotes))
+	for _, q := range quotes {
+		orig := symToTicker[strings.ToUpper(q.Symbol)]
+		if orig == "" {
+			orig = strings.ToUpper(q.Symbol)
+		}
+		sq := yahooToStockQuote(orig, q)
+		out[orig] = sq
+		_ = s.upsertCache(ctx, sq)
 	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("polygon reference returned %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var result polygonTickerDetailsResponse
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, err
-	}
-	return &result, nil
+	return out, nil
 }
 
-func (s *StockQuoteService) doGet(ctx context.Context, url string) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
+// yahooToStockQuote maps a Yahoo quote into the app's StockQuote model.
+func yahooToStockQuote(ticker string, q yahooQuote) *models.StockQuote {
+	name := q.LongName
+	if name == "" {
+		name = q.ShortName
 	}
-	return s.httpClient.Do(req)
+	if name == "" {
+		name = ticker
+	}
+	exchange := q.FullExchangeName
+	if exchange == "" {
+		exchange = q.Exchange
+	}
+	return &models.StockQuote{
+		Ticker:      ticker,
+		Name:        name,
+		Price:       q.RegularMarketPrice,
+		Change:      q.RegularMarketChange,
+		ChangePct:   q.RegularMarketChangePercent,
+		MarketCap:   q.MarketCap,
+		Volume:      q.RegularMarketVolume,
+		Week52High:  q.FiftyTwoWeekHigh,
+		Week52Low:   q.FiftyTwoWeekLow,
+		Exchange:    exchange,
+		LastUpdated: time.Now().UTC(),
+		Status:      "active",
+		Stale:       false,
+		DataSource:  "yahoo",
+	}
 }
 
 // IsNotFound checks if the error from GetQuote indicates the ticker doesn't exist.
